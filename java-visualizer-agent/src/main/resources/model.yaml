@@ -1,0 +1,181 @@
+openapi: 3.0.3
+info:
+  version: 1.0.0
+  title: Java Lens Visualizer
+
+paths: {}
+
+components:
+  schemas:
+    InstrumentedEvents:
+      type: object
+      required:
+        - events
+        - sink
+      properties:
+        sink:
+          $ref: '#/components/schemas/SinkConfiguration'
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventFlowDefinition'
+    EventFlowDefinition:
+      type: object
+      required:
+        - eventName
+        - eventStart
+        - eventEnd
+      properties:
+        eventName:
+          type: string
+          description: The name of the event
+        eventStart:
+          $ref: '#/components/schemas/EventCriteria'
+        eventEnd:
+          $ref: '#/components/schemas/EventCriteria'
+    EventCriteria:
+      type: object
+      required:
+        - objectType
+      discriminator:
+        propertyName: objectType
+      properties:
+        objectType:
+          type: string
+    MethodCriteria:
+      allOf:
+        - $ref: '#/components/schemas/EventCriteria'
+      type: object
+      required:
+        - methodClass
+        - methodName
+        - eventType
+      properties:
+        methodClass:
+          type: string
+        methodName:
+          type: string
+        eventType:
+          type: string
+          enum:
+            - START
+            - END
+        threadMatchPattern:
+          type: array
+          items:
+            type: string
+        arguments:
+          type: array
+          items:
+            $ref: '#/components/schemas/MethodArgumentCriteria'
+        traceArguments:
+          type: array
+          items:
+            $ref: '#/components/schemas/MethodArgument'
+    MethodArgument:
+      type: object
+      required:
+        - argumentName
+        - argumentType
+      properties:
+        argumentName:
+          type: string
+        argumentType:
+          type: string
+          enum:
+            - TARGET
+            - METHOD
+            - RETURN_OBJECT
+    MethodArgumentCriteria:
+      type: object
+      required:
+        - argumentName
+        - argumentType
+        - argumentValueMatchPattern
+      properties:
+        argumentName:
+          type: string
+        argumentValueMatchPattern:
+          type: string
+        argumentType:
+          type: string
+          enum:
+            - TARGET
+            - METHOD
+            - RETURN_OBJECT
+    EventBoundary:
+      type: object
+      required:
+        - eventName
+        - boundaryEpoch
+        - boundaryThread
+      properties:
+        eventName:
+          type: string
+        boundaryEpoch:
+          type: integer
+          format: int64
+        boundaryThread:
+          type: string
+        boundaryType:
+          type: string
+          enum:
+            - START
+            - END
+    Event:
+      type: object
+      required:
+        - eventName
+        - eventStart
+        - eventEnd
+      properties:
+        eventName:
+          type: string
+        eventStart:
+          $ref: '#/components/schemas/EventBoundary'
+        eventEnd:
+          $ref: '#/components/schemas/EventBoundary'
+
+    SinkConfiguration:
+      type: object
+      required:
+        - objectType
+      discriminator:
+        propertyName: objectType
+      properties:
+        objectType:
+          type: string
+
+    FileSystemSinkConfig:
+      allOf:
+        - $ref: '#/components/schemas/SinkConfiguration'
+      type: object
+      required:
+        - path
+        - chunkSize
+      properties:
+        chunkSize:
+          type: integer
+          default: 100
+          format: int32
+        path:
+          type: string
+        filePrefix:
+          type: string
+
+    AWSCloudWatchLogGroupSinkConfig:
+      allOf:
+        - $ref: '#/components/schemas/SinkConfiguration'
+      type: object
+      required:
+        - logGroupArn
+        - chunkSize
+      properties:
+        chunkSize:
+          type: integer
+          format: int32
+          default: 100
+        logGroupArn:
+          type: string
+        logStreamPrefix:
+          type: string
