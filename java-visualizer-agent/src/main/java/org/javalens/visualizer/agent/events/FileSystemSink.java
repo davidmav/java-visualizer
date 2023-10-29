@@ -6,6 +6,8 @@ import org.javalens.visualizer.model.EventBoundary;
 import org.javalens.visualizer.model.FileSystemSinkConfig;
 
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -40,16 +42,21 @@ public class FileSystemSink implements EventSink, AutoCloseable {
                     if ((poll = events.poll(100, TimeUnit.MILLISECONDS)) != null) {
                         currentChunk.add(poll);
                     }
-                } catch (InterruptedException e) {
+                } catch (InterruptedException ignored) {
+
                 }
                 if (currentChunk.size() == config.getChunkSize()) {
-                    flushChunk(kryo, currentChunk);
+                    try {
+                        flushChunk(kryo, currentChunk);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
             }
         });
     }
 
-    private void flushChunk(Kryo kryo, List<EventBoundary> currentChunk) {
+    private void flushChunk(Kryo kryo, List<EventBoundary> currentChunk) throws IOException {
         Path outputPath = Paths.get(config.getPath());
         String prefix;
         if (config.getFilePrefix() != null) {
@@ -58,6 +65,10 @@ public class FileSystemSink implements EventSink, AutoCloseable {
             prefix = DEFAULT_PREFIX;
         }
         outputPath = outputPath.resolve(prefix + "_" + System.currentTimeMillis());
+        Path parentFolder = outputPath.getParent();
+        if (!Files.exists(parentFolder)) {
+            Files.createDirectories(parentFolder);
+        }
         try (FileOutputStream fileOutputStream = new FileOutputStream(outputPath.toFile());
              Output output = new Output(fileOutputStream)) {
 

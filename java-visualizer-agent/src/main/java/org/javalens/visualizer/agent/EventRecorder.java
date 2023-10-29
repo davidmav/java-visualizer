@@ -25,6 +25,12 @@ public class EventRecorder {
                 .boundaryType(EventBoundary.BoundaryTypeEnum.fromValue(eventType.name())));
     }
 
+    public static void recordEvent() {
+        if (!INITIALIZED) {
+            throw new IllegalStateException("EventRecorder hasn't been initialized yet");
+        }
+    }
+
     static void initialize(EventSink sink) {
         SINK = sink;
         INITIALIZED = true;

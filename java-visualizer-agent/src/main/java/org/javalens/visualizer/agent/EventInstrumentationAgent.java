@@ -71,7 +71,7 @@ public class EventInstrumentationAgent {
     private static InstrumentedEvents loadInstrumentedEvents() throws IOException {
         String configurationFilePath = System.getProperty(JAVALENS_CONFIGURATION_FILE);
         if (configurationFilePath == null) {
-            throw new IllegalArgumentException("Please javalens.configurationFile Java System Property with a " +
+            throw new IllegalArgumentException("Please add javalens.configurationFile Java System Property with a " +
                     "configuration file to use the JavaLens Agent");
         }
         ObjectMapper objectMapper = new ObjectMapper();
