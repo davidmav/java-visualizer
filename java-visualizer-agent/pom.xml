@@ -68,6 +68,11 @@
                     <descriptorRefs>
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
+                    <archive>
+                        <manifestEntries>
+                            <Premain-Class>org.javalens.visualizer.agent.EventInstrumentationAgent</Premain-Class>
+                        </manifestEntries>
+                    </archive>
                 </configuration>
                 <executions>
                     <execution>
@@ -75,6 +80,34 @@
                         <phase>package</phase>
                         <goals>
                             <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <configuration>
+                    <artifactItems>
+                        <artifactItem>
+                            <groupId>${project.groupId}</groupId>
+                            <artifactId>dummy-test-app</artifactId>
+                            <version>${project.version}</version>
+                            <type>jar</type>
+                            <overWrite>true</overWrite>
+                            <outputDirectory>${project.build.directory}/dummy-test-app</outputDirectory>
+                            <destFileName>dummy-test-app.jar</destFileName>
+                        </artifactItem>
+                    </artifactItems>
+                    <overWriteReleases>false</overWriteReleases>
+                    <overWriteSnapshots>true</overWriteSnapshots>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>copy-dummy-app</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy</goal>
                         </goals>
                     </execution>
                 </executions>
@@ -97,6 +130,11 @@
                     <includes>
                         <include>**/IT*.java</include>
                     </includes>
+                    <systemPropertyVariables>
+                        <project.build.directory>${project.build.directory}</project.build.directory>
+                        <project.artifactId>${project.artifactId}</project.artifactId>
+                        <project.version>${project.version}</project.version>
+                    </systemPropertyVariables>
                 </configuration>
                 <executions>
                     <execution>
@@ -171,6 +209,12 @@
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
             <version>5.6.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.javalens</groupId>
+            <artifactId>dummy-test-app</artifactId>
+            <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
