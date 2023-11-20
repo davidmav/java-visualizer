@@ -1,26 +1,21 @@
 package org.javalens.visualizer.agent.events;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.logging.log4j.core.util.IOUtils;
 import org.javalens.dummyapp.consumer.DataConsumer;
 import org.javalens.dummyapp.producer.RandomDataProducer;
+import org.javalens.visualizer.analyzer.Analyzer;
 import org.javalens.visualizer.model.*;
 import org.junit.jupiter.api.Test;
 
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -44,22 +39,8 @@ public class ITEventInstrumentationAgentTest {
         }
         assertFalse(exited);
         process.destroy();
-        Kryo kryo = new Kryo();
 
-        List<EventBoundary> events = new ArrayList<>();
-        EventsSerializer serializer = new EventsSerializer();
-        try (Stream<Path> walk = Files.walk(testOutput)) {
-            walk.forEach(file -> {
-                if (Files.isRegularFile(file)) {
-                    try (InputStream is = new FileInputStream(file.toFile())) {
-                        Input input = new Input(is);
-                        events.addAll(kryo.readObject(input, ArrayList.class, serializer));
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            });
-        }
+        List<EventBoundary> events = EventsSerializer.readEventsFromDisk(testOutput);
         List<EventBoundary> consumptionStart = new ArrayList<>();
         List<EventBoundary> consumptionEnd = new ArrayList<>();
         List<EventBoundary> productionStart = new ArrayList<>();
@@ -85,6 +66,7 @@ public class ITEventInstrumentationAgentTest {
                 throw new IllegalArgumentException("Invalid EventName " + event.getEventName());
             }
         }
+        Analyzer.main(new String[]{testOutput.toString()});
         assertTrue(consumptionStart.size() > 0);
         assertTrue(consumptionEnd.size() > 0);
         assertTrue(productionStart.size() > 0);
@@ -100,8 +82,8 @@ public class ITEventInstrumentationAgentTest {
         Path agentPath = outputPath.resolve(artifactId + "-" + version + "-jar-with-dependencies.jar");
         Path dummyAppPath = outputPath.resolve("dummy-test-app").resolve("dummy-test-app.jar");
         String[] CMD_ARRAY =
-                {javaBin.toString(), "-javaagent:" + agentPath, "-cp", dummyAppPath.toString(), "-Djavalens" +
-                        ".configurationFile=" + instrumentedJson.toString(), DUMMY_APP_MAIN_CLASS};
+                {javaBin.toString(), "-javaagent:" + agentPath, "-cp", dummyAppPath.toString(),
+                        "-Djavalens.configurationFile=" + instrumentedJson.toString(), DUMMY_APP_MAIN_CLASS};
         System.out.println("Running " + Arrays.toString(CMD_ARRAY));
         return new ProcessBuilder(CMD_ARRAY).start();
     }
@@ -118,7 +100,7 @@ public class ITEventInstrumentationAgentTest {
                                         .methodClass(DataConsumer.class.getName())
                                         .traceArguments(List.of(
                                                 new MethodArgument()
-                                                        .argumentName("data.requestId")
+                                                        .argumentPath("[0].requestId")
                                                         .argumentType(MethodArgument.ArgumentTypeEnum.METHOD)))
                         ).eventEnd(
                                 new MethodCriteria()
@@ -127,7 +109,7 @@ public class ITEventInstrumentationAgentTest {
                                         .methodClass(DataConsumer.class.getName())
                                         .traceArguments(List.of(
                                                 new MethodArgument()
-                                                        .argumentName("data.requestId")
+                                                        .argumentPath("[0].requestId")
                                                         .argumentType(MethodArgument.ArgumentTypeEnum.METHOD)))
                         )
         );
@@ -141,7 +123,7 @@ public class ITEventInstrumentationAgentTest {
                                         .methodClass(RandomDataProducer.class.getName())
                                         .traceArguments(List.of(
                                                 new MethodArgument()
-                                                        .argumentName("requestId")
+                                                        .argumentPath("[0]")
                                                         .argumentType(MethodArgument.ArgumentTypeEnum.METHOD)))
                         ).eventEnd(
                                 new MethodCriteria()
@@ -150,7 +132,7 @@ public class ITEventInstrumentationAgentTest {
                                         .methodClass(RandomDataProducer.class.getName())
                                         .traceArguments(List.of(
                                                 new MethodArgument()
-                                                        .argumentName("requestId")
+                                                        .argumentPath("[0]")
                                                         .argumentType(MethodArgument.ArgumentTypeEnum.METHOD)))
                         )
         );

@@ -1,6 +1,5 @@
 package org.javalens.visualizer.agent;
 
-import org.javalens.visualizer.model.MethodCriteria;
 import org.javalens.visualizer.model.MethodCriteriaRecord;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
@@ -8,30 +7,16 @@ import org.objectweb.asm.Opcodes;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.security.ProtectionDomain;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class JavaLensClassTransformer implements ClassFileTransformer {
 
-    private final Map<String, Map<String, List<MethodCriteriaRecord>>> methodCriteriaMap;
 
-    public JavaLensClassTransformer(List<MethodCriteriaRecord> methodCriteriaRecords) {
-        this.methodCriteriaMap = new HashMap<>();
-        for (MethodCriteriaRecord methodCriteriaRecord : methodCriteriaRecords) {
-            indexInstrumentedMethods(methodCriteriaRecord);
-        }
-    }
+    private final EventConfigurationRepository methodCriteriaRepository;
 
-    private void indexInstrumentedMethods(MethodCriteriaRecord methodCriteriaRecord) {
-        MethodCriteria methodCriteria = methodCriteriaRecord.methodCriteria();
-        Map<String, List<MethodCriteriaRecord>> currentClassMethodCriteria =
-                this.methodCriteriaMap.computeIfAbsent(methodCriteria.getMethodClass(),
-                        k -> new HashMap<>());
-        String methodName = methodCriteria.getMethodName();
-        List<MethodCriteriaRecord> methodList = currentClassMethodCriteria.computeIfAbsent(methodName, k -> new ArrayList<>());
-        methodList.add(methodCriteriaRecord);
+    public JavaLensClassTransformer(EventConfigurationRepository methodCriteriaRepository) {
+        this.methodCriteriaRepository = methodCriteriaRepository;
     }
 
     @Override
@@ -40,12 +25,13 @@ public class JavaLensClassTransformer implements ClassFileTransformer {
             ProtectionDomain protectionDomain, byte[] classfileBuffer
     ) {
         String normalizedClass = className.replaceAll("/", ".");
-        if (!this.methodCriteriaMap.containsKey(normalizedClass)) {
+        if (!this.methodCriteriaRepository.containsClass(normalizedClass)) {
             // Not instrumented class
             return classfileBuffer;
         }
         try {
-            Map<String, List<MethodCriteriaRecord>> instrumentedMethods = this.methodCriteriaMap.get(normalizedClass);
+            Map<String, List<MethodCriteriaRecord>> instrumentedMethods =
+                    this.methodCriteriaRepository.getClassInstrumentedMethods(normalizedClass);
 
             // Use ASM to read and write class bytecode
             ClassReader cr = new ClassReader(classfileBuffer);
