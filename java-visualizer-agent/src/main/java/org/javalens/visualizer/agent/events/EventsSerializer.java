@@ -6,14 +6,40 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import org.javalens.visualizer.model.EventBoundary;
 
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 public class EventsSerializer extends Serializer<List<EventBoundary>> {
 
     public static final String EMPTY_STRING = "";
+
+    public static List<EventBoundary> readEventsFromDisk(Path path) throws IOException {
+        Kryo kryo = new Kryo();
+        EventsSerializer serializer = new EventsSerializer();
+        List<EventBoundary> events = new ArrayList<>();
+        try (Stream<Path> walk = Files.walk(path)) {
+            walk.forEach(file -> {
+                if (Files.isRegularFile(file)) {
+                    try (InputStream is = new FileInputStream(file.toFile())) {
+                        Input input = new Input(is);
+                        events.addAll(kryo.readObject(input, ArrayList.class, serializer));
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+        }
+        return events;
+    }
 
     @Override
     public void write(Kryo kryo, Output output, List<EventBoundary> object) {
@@ -26,6 +52,7 @@ public class EventsSerializer extends Serializer<List<EventBoundary>> {
                     output.writeBoolean(false);
                 } else {
                     output.writeBoolean(true);
+                    writeString(output, eventBoundary.getEventIdentifier());
                     writeLong(output, eventBoundary.getBoundaryEpoch());
                     writeString(output, eventBoundary.getEventName());
                     writeString(output, eventBoundary.getBoundaryThread());
@@ -36,11 +63,7 @@ public class EventsSerializer extends Serializer<List<EventBoundary>> {
     }
 
     private void writeLong(Output output, Long value) {
-        if (value == null) {
-            output.writeLong(-1, false);
-        } else {
-            output.writeLong(value, false);
-        }
+        output.writeLong(Objects.requireNonNullElse(value, -1L), false);
     }
 
     private void writeEnum(Output output, EventBoundary.BoundaryTypeEnum boundaryType) {
@@ -72,11 +95,13 @@ public class EventsSerializer extends Serializer<List<EventBoundary>> {
             for (int i = 0; i < size; i++) {
                 boolean nonNull = input.readBoolean();
                 if (nonNull) {
+                    String eventIdentifier = readString(input);
                     Long epoch = readLong(input);
                     String eventName = readString(input);
                     String boundaryThread = readString(input);
                     EventBoundary.BoundaryTypeEnum boundaryTypeEnum = readEnum(input);
                     result.add(new EventBoundary()
+                            .eventIdentifier(eventIdentifier)
                             .boundaryEpoch(epoch)
                             .eventName(eventName)
                             .boundaryThread(boundaryThread)

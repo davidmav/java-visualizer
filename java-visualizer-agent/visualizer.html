@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Event Visualization</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            display: flex;
+        }
+
+        .thread-axis {
+            flex: 0 0 200px; /* Adjust the width of the vertical axis as needed */
+            background-color: #f0f0f0;
+        }
+
+        .visualization-column {
+            flex-grow: 1;
+            position: relative;
+        }
+
+        .visualization {
+            position: absolute;
+            flex-grow: 1;
+            width: 10000px;
+        }
+
+        .event-rect {
+            position: absolute;
+            background-color: #007bff;
+            opacity: 0.7;
+            border: 1px solid #0056b3;
+            color: white;
+            cursor: pointer;
+            height: 12px;
+        }
+
+        /* Drop zone styles */
+        .drop-zone {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background-color: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .drop-zone-text {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        /* Horizontal axis styles */
+        .thread-label {
+            position: absolute;
+            left: 5px; /* Adjust the left position for thread labels */
+            font-weight: bold;
+        }
+
+        /* Separator styles */
+        .separator {
+            position: absolute;
+            left: 200px; /* Adjust the left position to match the width of the thread column */
+            top: 0;
+            width: 1px;
+            height: 100%;
+            background-color: #ccc;
+        }
+
+        .outer-container {
+            /* Apply any specific styles you need for the outer container */
+        }
+
+        .horizontal-divider {
+            height: 1px; /* Height of the divider */
+            background-color: #ccc; /* Color of the divider */
+            width: 100%; /* Width to match parent container */
+            margin: 10px 0; /* Optional margin for spacing */
+        }
+
+        .event-color-mapping {
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: white;
+            width: 90%;
+            margin-left: auto;
+            margin-right: auto;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .event-color-mapping table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .event-color-mapping th, .event-color-mapping td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .reset-button-container {
+            margin: 10px;
+            text-align: center;
+        }
+
+        #reset-button {
+            padding: 5px 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+    </style>
+</head>
+<body>
+<div id="outer-container" class="outer-container">
+    <div id="container" class="container">
+        <div class="thread-axis" id="thread-axis">
+            <!-- Vertical axis (threads) will be created here -->
+        </div>
+        <div class="separator"></div> <!-- Separator between thread names and events -->
+        <div class="visualization-column" id="visualization-column">
+            <div class="visualization" id="visualization">
+                <!-- Event rectangles will be created here -->
+            </div>
+        </div>
+    </div>
+</div>
+<div id="event-color-mapping" class="event-color-mapping">
+    <!-- Table of contents will be inserted here -->
+    <div class="reset-button-container">
+        <button id="reset-button" disabled>Reset Selections</button>
+    </div>
+</div>
+
+
+<div class="drop-zone" id="drop-zone">
+    <div class="drop-zone-text">Drag and drop a JSON file here</div>
+</div>
+<script>
+    const outerContainerDiv = document.getElementById('outer-container');
+    const visualizationDiv = document.getElementById('visualization');
+    const threadAxisDiv = document.getElementById('thread-axis');
+    const dropZone = document.getElementById('drop-zone');
+
+    dropZone.addEventListener('dragover', handleDragOver);
+    dropZone.addEventListener('drop', handleFileSelect);
+
+    function handleDragOver(event) {
+        event.preventDefault();
+    }
+
+    function handleFileSelect(event) {
+        event.preventDefault();
+
+        const files = event.dataTransfer.files;
+
+        if (files.length === 0) {
+            return;
+        }
+
+        const file = files[0];
+
+        if (file.type === 'application/json') {
+            const reader = new FileReader();
+
+            reader.onload = function (e) {
+                const events = JSON.parse(e.target.result);
+                visualizeEvents(events);
+            };
+
+            reader.readAsText(file);
+
+            // Hide the drop zone
+            dropZone.style.display = 'none';
+        } else {
+            alert('Please drop a valid JSON file.');
+        }
+    }
+
+    function createVisualizations(events) {
+        const eventNameToColorMap = new Map();
+
+        const minEpoch = Math.min(...events.map(event => event.eventStartEpoch));
+        const maxEpoch = Math.max(...events.map(event => event.eventEndEpoch));
+        const totalRange = maxEpoch - minEpoch;
+        visualizationDiv.width = events.length
+        // Create vertical axis (threads)
+        const threadNames = Array.from(new Set(events.map(event => event.thread)));
+
+        // Get the width of the visualization container in pixels
+        const containerWidth = visualizationDiv.clientWidth;
+
+        let totalOffset = 0;
+        events.forEach((event) => {
+            const eventDiv = document.createElement('div');
+
+            const eventDuration = event.eventEndEpoch - event.eventStartEpoch;
+
+            eventDiv.className = 'event-rect';
+            eventDiv.title = `Event: ${event.eventName}\nID: ${event.eventId}\nLatency: ${eventDuration}ms`;
+            const originalColor = stringToColor(event.eventName);
+            eventDiv.style.backgroundColor = originalColor;
+            eventDiv.dataset.originalColor = originalColor; // Store the color
+            eventDiv.dataset.id = event.eventId; // Store the color
+            eventNameToColorMap.set(event.eventName, originalColor);
+
+            const relativeStart = (event.eventStartEpoch - minEpoch) / totalRange;
+            const pixelOffset = relativeStart * containerWidth;
+
+            eventDiv.style.left = `${pixelOffset}px`;
+
+            // Calculate the width of each event in pixels
+
+            const eventPixelWidth = (eventDuration / totalRange) * containerWidth;
+            eventDiv.style.width = `${Math.max(eventPixelWidth, 1)}px`;
+            totalOffset = Math.max(totalOffset, pixelOffset + eventPixelWidth)
+            const threadIndex = threadNames.indexOf(event.thread);
+
+            // Calculate the width of the event
+            // Set the left position based on the cumulative width of previous events in the same thread
+            eventDiv.style.top = `${threadIndex * 40}px`; // Keep the vertical position based on the thread
+
+            visualizationDiv.appendChild(eventDiv);
+
+            eventDiv.addEventListener('click', () => {
+                // Highlight all events with the same ID
+                eventDiv.style.backgroundColor = stringToColor(event.eventId);
+                highlightEventsWithSameID(event.eventId);
+
+            });
+
+        });
+
+        threadNames.forEach((threadName, index) => {
+            const threadDiv = document.createElement('div');
+            threadDiv.className = 'event-rect thread';
+            threadDiv.style.top = `${(index * 40) + 20}px`;
+            threadDiv.style.width = `${totalOffset + 200}px`;
+            threadDiv.style.height = '2px';
+            threadDiv.style.backgroundColor = 'gray';
+            threadDiv.style.opacity = '0.5';
+            threadAxisDiv.appendChild(threadDiv);
+
+            // Create thread labels
+            const threadLabel = document.createElement('div');
+            threadLabel.className = 'thread-label';
+            threadLabel.textContent = threadName;
+            threadLabel.style.top = `${index * 40}px`;
+            threadAxisDiv.appendChild(threadLabel);
+        });
+        return {eventNameToColorMap, threadNames};
+    }
+
+    function createTable(eventNameToColorMap, threadNames, statistics) {
+        // Create table of contents for event to color mapping
+        const tableOfContents = document.createElement('table');
+        const headerRow = tableOfContents.insertRow();
+        headerRow.innerHTML = "<th>Event Name</th><th>Color</th><th>Minimum Latency</th><th>Average Latency</th><th>P99 Latency</th><th>P99.9 Latency</th><th>Maximum Latency</th><th>Count</th>";
+
+        eventNameToColorMap.forEach((color, eventName) => {
+            const row = tableOfContents.insertRow();
+            stats = statistics[eventName]
+            row.innerHTML = `<td>${eventName}</td><td style="background-color:${color};"></td><td>${stats.min}</td><td>${stats.avg}</td><td>${stats.p99}</td><td>${stats.p999}</td><td>${stats.max}</td><td>${stats.count}</td>`;
+        });
+
+        const eventColorMappingDiv = document.getElementById('event-color-mapping');
+        eventColorMappingDiv.style.marginTop = `${threadNames.length * 40}px`;
+        eventColorMappingDiv.style.marginLeft = `250px`;
+        eventColorMappingDiv.style.width = `950px`;
+        eventColorMappingDiv.style.display = `flex`;
+        eventColorMappingDiv.appendChild(tableOfContents);
+
+        // Set up the reset button event listener
+        document.getElementById('reset-button').addEventListener('click', resetSelections);
+    }
+
+    function visualizeEvents(events) {
+        const {eventNameToColorMap, threadNames} = createVisualizations(events);
+        let statistics = createStatistics(events);
+        createTable(eventNameToColorMap, threadNames, statistics);
+    }
+
+    function stringToColor(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+
+        let color = '#';
+        for (let i = 0; i < 3; i++) {
+            const value = (hash >> (i * 8)) & 0xFF;
+            color += ('00' + value.toString(16)).substr(-2);
+        }
+        return color;
+    }
+
+    function highlightEventsWithSameID(eventId) {
+        const allEventRects = document.querySelectorAll('.event-rect');
+        document.getElementById('reset-button').disabled = false;
+        // Highlight events with the same ID
+        allEventRects.forEach(div => {
+            if (div.dataset.id === eventId) {
+                div.style.backgroundColor = stringToColor(eventId);
+            }
+        });
+    }
+
+    function resetSelections() {
+        const allEventRects = document.querySelectorAll('.event-rect');
+        allEventRects.forEach(div => {
+            if (div.dataset.id != null) {
+                div.style.backgroundColor = div.dataset.originalColor
+            }
+        });
+        document.getElementById('reset-button').disabled = true;
+    }
+
+    function createStatistics(events) {
+        const eventData = {};
+
+        events.forEach(event => {
+            if (!eventData[event.eventName]) {
+                eventData[event.eventName] = {
+                    color: stringToColor(event.eventName),
+                    latencies: [],
+                    min: Infinity,
+                    max: -Infinity,
+                    total: 0,
+                    count: 0
+                };
+            }
+            if (event.eventEndEpoch > 0 && event.eventStartEpoch > 0) {
+                const latency = event.eventEndEpoch - event.eventStartEpoch;
+                eventData[event.eventName].latencies.push(latency);
+                eventData[event.eventName].min = Math.min(eventData[event.eventName].min, latency);
+                eventData[event.eventName].max = Math.max(eventData[event.eventName].max, latency);
+                eventData[event.eventName].total += latency;
+                eventData[event.eventName].count += 1;
+            }
+        });
+
+        // Compute statistics for each event
+        Object.keys(eventData).forEach(eventName => {
+            const data = eventData[eventName];
+            const count = data.count;
+            data.avg = data.total / count;
+            data.latencies.sort((a, b) => a - b);
+            data.p99 = data.latencies[Math.floor(0.99 * count)];
+            data.p999 = data.latencies[Math.floor(0.999 * count)];
+        });
+        return eventData
+    }
+</script>
+</body>
+</html>

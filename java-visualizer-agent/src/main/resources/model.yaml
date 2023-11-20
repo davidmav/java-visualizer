@@ -61,9 +61,7 @@ components:
             - START
             - END
         threadMatchPattern:
-          type: array
-          items:
-            type: string
+          type: string
         arguments:
           type: array
           items:
@@ -75,10 +73,10 @@ components:
     MethodArgument:
       type: object
       required:
-        - argumentName
+        - argumentPath
         - argumentType
       properties:
-        argumentName:
+        argumentPath:
           type: string
         argumentType:
           type: string
@@ -89,11 +87,11 @@ components:
     MethodArgumentCriteria:
       type: object
       required:
-        - argumentName
+        - argumentPath
         - argumentType
         - argumentValueMatchPattern
       properties:
-        argumentName:
+        argumentPath:
           type: string
         argumentValueMatchPattern:
           type: string
@@ -122,19 +120,28 @@ components:
           enum:
             - START
             - END
+        eventIdentifier:
+          type: string
+
     Event:
       type: object
       required:
         - eventName
-        - eventStart
-        - eventEnd
+        - eventStartEpoch
+        - eventEndEpoch
       properties:
         eventName:
           type: string
-        eventStart:
-          $ref: '#/components/schemas/EventBoundary'
-        eventEnd:
-          $ref: '#/components/schemas/EventBoundary'
+        eventId:
+          type: string
+        thread:
+          type: string
+        eventStartEpoch:
+          type: integer
+          format: int64
+        eventEndEpoch:
+          type: integer
+          format: int64
 
     SinkConfiguration:
       type: object
