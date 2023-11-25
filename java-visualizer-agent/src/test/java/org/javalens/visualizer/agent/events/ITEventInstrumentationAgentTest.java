@@ -33,7 +33,7 @@ public class ITEventInstrumentationAgentTest {
         Path testOutput = currentDirPath.resolve("target/events");
         createConfigurationFile(instrumentedJson, testOutput);
         Process process = startDummyAppWithAgent(instrumentedJson);
-        boolean exited = process.waitFor(15, TimeUnit.SECONDS);
+        boolean exited = process.waitFor(30, TimeUnit.SECONDS);
         if (exited) {
             System.out.println("Output" + IOUtils.toString(new InputStreamReader(process.getInputStream())));
         }

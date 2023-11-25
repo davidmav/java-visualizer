@@ -3,8 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Event Visualization</title>
+    <title>Java Visualizer Event Visualization</title>
     <style>
+        .page-header {
+            text-align: center; /* Center-align the text horizontally */
+            padding: 20px 0; /* Add padding to the top and bottom for spacing */
+            margin: 0; /* Remove any default margin */
+            background-color: #007bff; /* Background color for the header */
+            color: white; /* Text color for the header */
+        }
+        .row {
+            display: flex;
+            flex-direction: column;
+        }
+
         body {
             font-family: Arial, sans-serif;
             margin: 0;
@@ -13,22 +25,33 @@
 
         .container {
             display: flex;
+            position: relative;
+            width: 100%;
+            height: 60vh;
+            overflow-x: hidden;
+            overflow-y: auto;/* Prevent scrolling on the main container */
         }
 
         .thread-axis {
+            position: relative;
+            left: 0;
+            top: 0; /* Align to the top */
+            height: 60vh; /* Full viewport height */
+            z-index: 10; /* Above the scrollable content */
             flex: 0 0 200px; /* Adjust the width of the vertical axis as needed */
-            background-color: #f0f0f0;
         }
 
         .visualization-column {
-            flex-grow: 1;
+            overflow-x: auto; /* Enable horizontal scrolling */
+            overflow-y: hidden;
             position: relative;
+            margin-left: 10px; /* Space for the thread-axis */
         }
 
         .visualization {
-            position: absolute;
-            flex-grow: 1;
-            width: 10000px;
+            width: 10000px; /* Adjust this width as necessary */
+            display: flex;
+            flex: 1 1 auto; /* Adjust the width of the vertical axis as needed */
         }
 
         .event-rect {
@@ -46,7 +69,7 @@
             width: 100%;
             height: 100%;
             position: absolute;
-            top: 0;
+            top: 80px;
             left: 0;
             background-color: rgba(255, 255, 255, 0.7);
             display: flex;
@@ -71,14 +94,8 @@
         .separator {
             position: absolute;
             left: 200px; /* Adjust the left position to match the width of the thread column */
-            top: 0;
             width: 1px;
-            height: 100%;
             background-color: #ccc;
-        }
-
-        .outer-container {
-            /* Apply any specific styles you need for the outer container */
         }
 
         .horizontal-divider {
@@ -110,7 +127,7 @@
             text-align: left;
         }
 
-        .reset-button-container {
+        .button-container {
             margin: 10px;
             text-align: center;
         }
@@ -121,38 +138,103 @@
             cursor: pointer;
         }
 
+        #search-button {
+            padding: 5px 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .search-container {
+            display: flex;
+            align-items: center; /* Vertically align items */
+            gap: 10px;
+        }
+
+        /* Adjust the width of the textarea and button as needed */
+        #event-id-input {
+            width: 100%; /* Make the textarea take up all available space horizontally */
+            height: auto; /* Set the height to your desired value */
+        }
+
+        .context-menu {
+            position: absolute;
+            display: none;
+            background-color: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+        }
+
+        .context-menu ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .context-menu ul li {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .context-menu ul li:hover {
+            background-color: #f0f0f0;
+        }
+
     </style>
 </head>
 <body>
-<div id="outer-container" class="outer-container">
+<h1 class="page-header">Java Visualizer Event Visualization</h1>
     <div id="container" class="container">
         <div class="thread-axis" id="thread-axis">
             <!-- Vertical axis (threads) will be created here -->
         </div>
-        <div class="separator"></div> <!-- Separator between thread names and events -->
+        <div id="separator" class="separator"></div> <!-- Separator between thread names and events -->
         <div class="visualization-column" id="visualization-column">
             <div class="visualization" id="visualization">
                 <!-- Event rectangles will be created here -->
             </div>
         </div>
     </div>
-</div>
-<div id="event-color-mapping" class="event-color-mapping">
-    <!-- Table of contents will be inserted here -->
-    <div class="reset-button-container">
-        <button id="reset-button" disabled>Reset Selections</button>
+<div id="statistics" class="event-color-mapping row">
+    <div>
+        <div class="search-container">
+            <button id="search-button">Search</button>
+            <textarea id="event-id-input" placeholder="Enter Event ID"></textarea>
+        </div>
+        <div class="button-container">
+        </div>
+    </div>
+    <div class="row">
+        <!-- Table of contents will be inserted here -->
+        <div id="statistics-table"></div>
+    </div>
+    <div id="total-time" class="button-container">
+
+    </div>
+    <div class="row">
+        <div class="button-container">
+            <button id="reset-button" disabled>Reset Selections</button>
+        </div>
     </div>
 </div>
-
 
 <div class="drop-zone" id="drop-zone">
     <div class="drop-zone-text">Drag and drop a JSON file here</div>
 </div>
+
+<div id="context-menu" class="context-menu">
+    <ul>
+        <li><a id="select-option">Select</a></li>
+    </ul>
+</div>
 <script>
-    const outerContainerDiv = document.getElementById('outer-container');
     const visualizationDiv = document.getElementById('visualization');
+    const separatorDiv = document.getElementById('separator');
+    const visualizationColumnDiv = document.getElementById('visualization-column');
     const threadAxisDiv = document.getElementById('thread-axis');
     const dropZone = document.getElementById('drop-zone');
+    const totalTimeDiv = document.getElementById('total-time');
+    let events = null;
 
     dropZone.addEventListener('dragover', handleDragOver);
     dropZone.addEventListener('drop', handleFileSelect);
@@ -176,7 +258,7 @@
             const reader = new FileReader();
 
             reader.onload = function (e) {
-                const events = JSON.parse(e.target.result);
+                events = JSON.parse(e.target.result);
                 visualizeEvents(events);
             };
 
@@ -190,17 +272,27 @@
     }
 
     function createVisualizations(events) {
+
+        visualizationDiv.innerHTML = ""
+        threadAxisDiv.innerHTML = ""
+        totalTimeDiv.innerHTML = ""
+
         const eventNameToColorMap = new Map();
 
         const minEpoch = Math.min(...events.map(event => event.eventStartEpoch));
         const maxEpoch = Math.max(...events.map(event => event.eventEndEpoch));
         const totalRange = maxEpoch - minEpoch;
         visualizationDiv.width = events.length
+
+        const totalTimeValue = document.createElement('h3');
+        totalTimeValue.textContent = `Total Events Span: ${totalRange} ms`
+        totalTimeDiv.appendChild(totalTimeValue);
+
         // Create vertical axis (threads)
         const threadNames = Array.from(new Set(events.map(event => event.thread)));
 
         // Get the width of the visualization container in pixels
-        const containerWidth = visualizationDiv.clientWidth;
+        const containerWidth = Math.max(1200, Math.min(10000, visualizationDiv.width));
 
         let totalOffset = 0;
         events.forEach((event) => {
@@ -230,7 +322,7 @@
 
             // Calculate the width of the event
             // Set the left position based on the cumulative width of previous events in the same thread
-            eventDiv.style.top = `${threadIndex * 40}px`; // Keep the vertical position based on the thread
+            eventDiv.style.top = `${10 + threadIndex * 40}px`; // Keep the vertical position based on the thread
 
             visualizationDiv.appendChild(eventDiv);
 
@@ -243,11 +335,16 @@
 
         });
 
+        visualizationColumnDiv.style.height = `${10 + threadNames.length * 40}px`
+        separatorDiv.style.height = `${10 + threadNames.length * 40}px`
+        visualizationDiv.clientWidth = totalOffset
+        visualizationDiv.style.width = `${totalOffset}px`;
+
         threadNames.forEach((threadName, index) => {
             const threadDiv = document.createElement('div');
             threadDiv.className = 'event-rect thread';
-            threadDiv.style.top = `${(index * 40) + 20}px`;
-            threadDiv.style.width = `${totalOffset + 200}px`;
+            threadDiv.style.top = `${(10 + index * 40) + 20}px`;
+            threadDiv.style.width = `${1000 + totalOffset}px`;
             threadDiv.style.height = '2px';
             threadDiv.style.backgroundColor = 'gray';
             threadDiv.style.opacity = '0.5';
@@ -257,13 +354,13 @@
             const threadLabel = document.createElement('div');
             threadLabel.className = 'thread-label';
             threadLabel.textContent = threadName;
-            threadLabel.style.top = `${index * 40}px`;
+            threadLabel.style.top = `${10+ index * 40}px`;
             threadAxisDiv.appendChild(threadLabel);
         });
         return {eventNameToColorMap, threadNames};
     }
 
-    function createTable(eventNameToColorMap, threadNames, statistics) {
+    function createStatisticsTable(eventNameToColorMap, threadNames, statistics) {
         // Create table of contents for event to color mapping
         const tableOfContents = document.createElement('table');
         const headerRow = tableOfContents.insertRow();
@@ -275,12 +372,14 @@
             row.innerHTML = `<td>${eventName}</td><td style="background-color:${color};"></td><td>${stats.min}</td><td>${stats.avg}</td><td>${stats.p99}</td><td>${stats.p999}</td><td>${stats.max}</td><td>${stats.count}</td>`;
         });
 
-        const eventColorMappingDiv = document.getElementById('event-color-mapping');
-        eventColorMappingDiv.style.marginTop = `${threadNames.length * 40}px`;
-        eventColorMappingDiv.style.marginLeft = `250px`;
-        eventColorMappingDiv.style.width = `950px`;
-        eventColorMappingDiv.style.display = `flex`;
-        eventColorMappingDiv.appendChild(tableOfContents);
+        const statisticsElement = document.getElementById('statistics');
+        const statisticsTable = document.getElementById('statistics-table');
+        statisticsTable.innerHTML = ""
+        //statisticsElement.style.marginTop = `${threadNames.length * 40}px`;
+        statisticsElement.style.marginLeft = `250px`;
+        statisticsElement.style.width = `950px`;
+        statisticsElement.style.display = `flex`;
+        statisticsTable.appendChild(tableOfContents);
 
         // Set up the reset button event listener
         document.getElementById('reset-button').addEventListener('click', resetSelections);
@@ -289,7 +388,7 @@
     function visualizeEvents(events) {
         const {eventNameToColorMap, threadNames} = createVisualizations(events);
         let statistics = createStatistics(events);
-        createTable(eventNameToColorMap, threadNames, statistics);
+        createStatisticsTable(eventNameToColorMap, threadNames, statistics);
     }
 
     function stringToColor(str) {
@@ -325,6 +424,7 @@
             }
         });
         document.getElementById('reset-button').disabled = true;
+        visualizeEvents(events)
     }
 
     function createStatistics(events) {
@@ -362,6 +462,79 @@
         });
         return eventData
     }
+
+    const searchButton = document.getElementById('search-button');
+    searchButton.addEventListener('click', searchByEventId);
+
+    function searchByEventId() {
+        document.getElementById('reset-button').disabled = false;
+        const eventIdInput = document.getElementById('event-id-input').value;
+        if (!eventIdInput) {
+            alert('Please enter an Event ID to search.');
+            return;
+        }
+
+        // Filter events by Event ID
+        const filteredEvents = events.filter(event => event.eventId === eventIdInput);
+
+        if (filteredEvents.length === 0) {
+            alert('No events found with the provided Event ID.');
+            return;
+        }
+
+        visualizeEvents(filteredEvents)
+    }
+
+    // Add this code to your existing JavaScript
+    const contextMenu = document.getElementById('context-menu');
+    const selectOption = document.getElementById('select-option');
+    let selectedEventId = null;
+
+    // Function to show the context menu at the specified position
+    function showContextMenu(x, y) {
+        const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+        const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+        contextMenu.style.left = `${x + scrollX}px`;
+        contextMenu.style.top = `${y + scrollY}px`;
+        contextMenu.style.display = 'block';
+    }
+
+    // Function to hide the context menu
+    function hideContextMenu() {
+        contextMenu.style.display = 'none';
+    }
+
+    // Event listener for right-click on event rectangles
+    visualizationDiv.addEventListener('contextmenu', (e) => {
+        e.preventDefault(); // Prevent the default context menu
+        const target = e.target;
+
+        if (target.classList.contains('event-rect')) {
+            // Get the event ID associated with the right-clicked element
+            selectedEventId = target.dataset.id;
+
+            // Show the context menu at the mouse position
+            showContextMenu(e.clientX, e.clientY);
+        }
+    });
+
+    // Event listener for the "Select" option in the context menu
+    selectOption.addEventListener('click', () => {
+        if (selectedEventId) {
+            // Search for the selected event by its ID
+            const eventIdInput = document.getElementById('event-id-input');
+            eventIdInput.value = selectedEventId
+            searchByEventId(selectedEventId);
+
+            // Hide the context menu
+            hideContextMenu();
+        }
+    });
+
+    // Event listener to hide the context menu when clicking elsewhere in the document
+    document.addEventListener('click', () => {
+        hideContextMenu();
+    });
 </script>
 </body>
 </html>
