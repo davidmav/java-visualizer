@@ -48,8 +48,8 @@ public class App
 
         BlockingQueue<Data> queue = new LinkedBlockingQueue<>();
 
-        executorService = Executors.newFixedThreadPool(10);
-        for (int i=0; i<5;i++) {
+        executorService = Executors.newFixedThreadPool(50);
+        for (int i=0; i<25;i++) {
             executorService.submit(new Runnable() {
                 @Override
                 public void run() {
@@ -65,7 +65,7 @@ public class App
                 }
             });
         }
-        for (int i=0; i<5;i++) {
+        for (int i=0; i<25;i++) {
             executorService.submit(new Runnable() {
                 @Override
                 public void run() {
