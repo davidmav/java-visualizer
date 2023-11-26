@@ -133,7 +133,7 @@ Options
 After collecting enough event data, export the report using the command-line options above.
 
 Sample Report
-A sample report can be viewed here: [a relative link](sample_report.html)
+A sample report can be viewed here: [a relative link](java-visualizer-agent/sample_report.html)
 
 Contribution
 Contributions to the project are welcome. Please follow the standard GitHub pull request process to submit your changes.
