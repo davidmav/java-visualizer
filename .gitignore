@@ -1,9 +1,11 @@
+.idea
+.DS_*
 # Compiled class file
 *.class
-
+*.html
 # Log file
 *.log
-
+*.json
 # BlueJ files
 *.ctxt
 

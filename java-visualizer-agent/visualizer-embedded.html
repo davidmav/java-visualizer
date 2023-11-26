@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java Visualizer Event Visualization</title>
+    <style>
+        .page-header {
+            text-align: center; /* Center-align the text horizontally */
+            padding: 20px 0; /* Add padding to the top and bottom for spacing */
+            margin: 0; /* Remove any default margin */
+            background-color: #007bff; /* Background color for the header */
+            color: white; /* Text color for the header */
+        }
+        .row {
+            display: flex;
+            flex-direction: column;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            display: flex;
+            position: relative;
+            width: 100%;
+            height: 60vh;
+            overflow-x: hidden;
+            overflow-y: auto;/* Prevent scrolling on the main container */
+        }
+
+        .thread-axis {
+            position: relative;
+            left: 0;
+            top: 0; /* Align to the top */
+            height: 60vh; /* Full viewport height */
+            z-index: 10; /* Above the scrollable content */
+            flex: 0 0 200px; /* Adjust the width of the vertical axis as needed */
+        }
+
+        .visualization-column {
+            overflow-x: auto; /* Enable horizontal scrolling */
+            overflow-y: hidden;
+            position: relative;
+            margin-left: 10px; /* Space for the thread-axis */
+        }
+
+        .visualization {
+            width: 10000px; /* Adjust this width as necessary */
+            display: flex;
+            flex: 1 1 auto; /* Adjust the width of the vertical axis as needed */
+        }
+
+        .event-rect {
+            position: absolute;
+            background-color: #007bff;
+            opacity: 0.7;
+            border: 1px solid #0056b3;
+            color: white;
+            cursor: pointer;
+            height: 12px;
+        }
+
+        /* Drop zone styles */
+        .drop-zone {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 80px;
+            left: 0;
+            background-color: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .drop-zone-text {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        /* Horizontal axis styles */
+        .thread-label {
+            position: absolute;
+            left: 5px; /* Adjust the left position for thread labels */
+            font-weight: bold;
+        }
+
+        /* Separator styles */
+        .separator {
+            position: absolute;
+            left: 200px; /* Adjust the left position to match the width of the thread column */
+            width: 1px;
+            background-color: #ccc;
+        }
+
+        .horizontal-divider {
+            height: 1px; /* Height of the divider */
+            background-color: #ccc; /* Color of the divider */
+            width: 100%; /* Width to match parent container */
+            margin: 10px 0; /* Optional margin for spacing */
+        }
+
+        .event-color-mapping {
+            padding: 10px;
+            border: 1px solid #ccc;
+            background-color: white;
+            width: 90%;
+            margin-left: auto;
+            margin-right: auto;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+
+        .event-color-mapping table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .event-color-mapping th, .event-color-mapping td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .button-container {
+            margin: 10px;
+            text-align: center;
+        }
+
+        #reset-button {
+            padding: 5px 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        #search-button {
+            padding: 5px 10px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .search-container {
+            display: flex;
+            align-items: center; /* Vertically align items */
+            gap: 10px;
+        }
+
+        /* Adjust the width of the textarea and button as needed */
+        #event-id-input {
+            width: 100%; /* Make the textarea take up all available space horizontally */
+            height: auto; /* Set the height to your desired value */
+        }
+
+        .context-menu {
+            position: absolute;
+            display: none;
+            background-color: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+        }
+
+        .context-menu ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .context-menu ul li {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+
+        .context-menu ul li:hover {
+            background-color: #f0f0f0;
+        }
+
+    </style>
+</head>
+<body>
+<h1 class="page-header">Java Visualizer Event Visualization</h1>
+    <div id="container" class="container">
+        <div class="thread-axis" id="thread-axis">
+            <!-- Vertical axis (threads) will be created here -->
+        </div>
+        <div id="separator" class="separator"></div> <!-- Separator between thread names and events -->
+        <div class="visualization-column" id="visualization-column">
+            <div class="visualization" id="visualization">
+                <!-- Event rectangles will be created here -->
+            </div>
+        </div>
+    </div>
+<div id="statistics" class="event-color-mapping row">
+    <div>
+        <div class="search-container">
+            <button id="search-button">Search</button>
+            <textarea id="event-id-input" placeholder="Enter Event ID"></textarea>
+        </div>
+        <div class="button-container">
+        </div>
+    </div>
+    <div class="row">
+        <!-- Table of contents will be inserted here -->
+        <div id="statistics-table"></div>
+    </div>
+    <div id="total-time" class="button-container">
+
+    </div>
+    <div class="row">
+        <div class="button-container">
+            <button id="reset-button" disabled>Reset Selections</button>
+        </div>
+    </div>
+</div>
+
+<div id="context-menu" class="context-menu">
+    <ul>
+        <li><a id="select-option">Select</a></li>
+    </ul>
+</div>
+<script>
+    const visualizationDiv = document.getElementById('visualization');
+    const separatorDiv = document.getElementById('separator');
+    const visualizationColumnDiv = document.getElementById('visualization-column');
+    const threadAxisDiv = document.getElementById('thread-axis');
+    const totalTimeDiv = document.getElementById('total-time');
+    let jsonData = []
+    let events = jsonData;
+
+    visualizeEvents(events);
+    function createVisualizations(events) {
+
+        visualizationDiv.innerHTML = ""
+        threadAxisDiv.innerHTML = ""
+        totalTimeDiv.innerHTML = ""
+
+        const eventNameToColorMap = new Map();
+
+        const minEpoch = Math.min(...events.map(event => event.eventStartEpoch));
+        const maxEpoch = Math.max(...events.map(event => event.eventEndEpoch));
+        const totalRange = maxEpoch - minEpoch;
+        visualizationDiv.width = events.length
+
+        const totalTimeValue = document.createElement('h3');
+        totalTimeValue.textContent = `Total Events Span: ${totalRange} ms`
+        totalTimeDiv.appendChild(totalTimeValue);
+
+        // Create vertical axis (threads)
+        const threadNames = Array.from(new Set(events.map(event => event.thread)));
+
+        // Get the width of the visualization container in pixels
+        const containerWidth = Math.max(1200, Math.min(10000, visualizationDiv.width));
+
+        let totalOffset = 0;
+        events.forEach((event) => {
+            const eventDiv = document.createElement('div');
+
+            const eventDuration = event.eventEndEpoch - event.eventStartEpoch;
+
+            eventDiv.className = 'event-rect';
+            eventDiv.title = `Event: ${event.eventName}\nID: ${event.eventId}\nLatency: ${eventDuration}ms`;
+            const originalColor = stringToColor(event.eventName);
+            eventDiv.style.backgroundColor = originalColor;
+            eventDiv.dataset.originalColor = originalColor; // Store the color
+            eventDiv.dataset.id = event.eventId; // Store the color
+            eventNameToColorMap.set(event.eventName, originalColor);
+
+            const relativeStart = (event.eventStartEpoch - minEpoch) / totalRange;
+            const pixelOffset = relativeStart * containerWidth;
+
+            eventDiv.style.left = `${pixelOffset}px`;
+
+            // Calculate the width of each event in pixels
+
+            const eventPixelWidth = (eventDuration / totalRange) * containerWidth;
+            eventDiv.style.width = `${Math.max(eventPixelWidth, 1)}px`;
+            totalOffset = Math.max(totalOffset, pixelOffset + eventPixelWidth)
+            const threadIndex = threadNames.indexOf(event.thread);
+
+            // Calculate the width of the event
+            // Set the left position based on the cumulative width of previous events in the same thread
+            eventDiv.style.top = `${10 + threadIndex * 40}px`; // Keep the vertical position based on the thread
+
+            visualizationDiv.appendChild(eventDiv);
+
+            eventDiv.addEventListener('click', () => {
+                // Highlight all events with the same ID
+                eventDiv.style.backgroundColor = stringToColor(event.eventId);
+                highlightEventsWithSameID(event.eventId);
+
+            });
+
+        });
+
+        visualizationColumnDiv.style.height = `${10 + threadNames.length * 40}px`
+        separatorDiv.style.height = `${10 + threadNames.length * 40}px`
+        visualizationDiv.clientWidth = totalOffset
+        visualizationDiv.style.width = `${totalOffset}px`;
+
+        threadNames.forEach((threadName, index) => {
+            const threadDiv = document.createElement('div');
+            threadDiv.className = 'event-rect thread';
+            threadDiv.style.top = `${(10 + index * 40) + 20}px`;
+            threadDiv.style.width = `${1000 + totalOffset}px`;
+            threadDiv.style.height = '2px';
+            threadDiv.style.backgroundColor = 'gray';
+            threadDiv.style.opacity = '0.5';
+            threadAxisDiv.appendChild(threadDiv);
+
+            // Create thread labels
+            const threadLabel = document.createElement('div');
+            threadLabel.className = 'thread-label';
+            threadLabel.textContent = threadName;
+            threadLabel.style.top = `${10+ index * 40}px`;
+            threadAxisDiv.appendChild(threadLabel);
+        });
+        return {eventNameToColorMap, threadNames};
+    }
+
+    function createStatisticsTable(eventNameToColorMap, threadNames, statistics) {
+        // Create table of contents for event to color mapping
+        const tableOfContents = document.createElement('table');
+        const headerRow = tableOfContents.insertRow();
+        headerRow.innerHTML = "<th>Event Name</th><th>Color</th><th>Minimum Latency</th><th>Average Latency</th><th>P99 Latency</th><th>P99.9 Latency</th><th>Maximum Latency</th><th>Count</th>";
+
+        eventNameToColorMap.forEach((color, eventName) => {
+            const row = tableOfContents.insertRow();
+            stats = statistics[eventName]
+            row.innerHTML = `<td>${eventName}</td><td style="background-color:${color};"></td><td>${stats.min}</td><td>${stats.avg}</td><td>${stats.p99}</td><td>${stats.p999}</td><td>${stats.max}</td><td>${stats.count}</td>`;
+        });
+
+        const statisticsElement = document.getElementById('statistics');
+        const statisticsTable = document.getElementById('statistics-table');
+        statisticsTable.innerHTML = ""
+        //statisticsElement.style.marginTop = `${threadNames.length * 40}px`;
+        statisticsElement.style.marginLeft = `250px`;
+        statisticsElement.style.width = `950px`;
+        statisticsElement.style.display = `flex`;
+        statisticsTable.appendChild(tableOfContents);
+
+        // Set up the reset button event listener
+        document.getElementById('reset-button').addEventListener('click', resetSelections);
+    }
+
+    function visualizeEvents(events) {
+        const {eventNameToColorMap, threadNames} = createVisualizations(events);
+        let statistics = createStatistics(events);
+        createStatisticsTable(eventNameToColorMap, threadNames, statistics);
+    }
+
+    function stringToColor(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        }
+
+        let color = '#';
+        for (let i = 0; i < 3; i++) {
+            const value = (hash >> (i * 8)) & 0xFF;
+            color += ('00' + value.toString(16)).substr(-2);
+        }
+        return color;
+    }
+
+    function highlightEventsWithSameID(eventId) {
+        const allEventRects = document.querySelectorAll('.event-rect');
+        document.getElementById('reset-button').disabled = false;
+        // Highlight events with the same ID
+        allEventRects.forEach(div => {
+            if (div.dataset.id === eventId) {
+                div.style.backgroundColor = stringToColor(eventId);
+            }
+        });
+    }
+
+    function resetSelections() {
+        const allEventRects = document.querySelectorAll('.event-rect');
+        allEventRects.forEach(div => {
+            if (div.dataset.id != null) {
+                div.style.backgroundColor = div.dataset.originalColor
+            }
+        });
+        document.getElementById('reset-button').disabled = true;
+        visualizeEvents(events)
+    }
+
+    function createStatistics(events) {
+        const eventData = {};
+
+        events.forEach(event => {
+            if (!eventData[event.eventName]) {
+                eventData[event.eventName] = {
+                    color: stringToColor(event.eventName),
+                    latencies: [],
+                    min: Infinity,
+                    max: -Infinity,
+                    total: 0,
+                    count: 0
+                };
+            }
+            if (event.eventEndEpoch > 0 && event.eventStartEpoch > 0) {
+                const latency = event.eventEndEpoch - event.eventStartEpoch;
+                eventData[event.eventName].latencies.push(latency);
+                eventData[event.eventName].min = Math.min(eventData[event.eventName].min, latency);
+                eventData[event.eventName].max = Math.max(eventData[event.eventName].max, latency);
+                eventData[event.eventName].total += latency;
+                eventData[event.eventName].count += 1;
+            }
+        });
+
+        // Compute statistics for each event
+        Object.keys(eventData).forEach(eventName => {
+            const data = eventData[eventName];
+            const count = data.count;
+            data.avg = data.total / count;
+            data.latencies.sort((a, b) => a - b);
+            data.p99 = data.latencies[Math.floor(0.99 * count)];
+            data.p999 = data.latencies[Math.floor(0.999 * count)];
+        });
+        return eventData
+    }
+
+    const searchButton = document.getElementById('search-button');
+    searchButton.addEventListener('click', searchByEventId);
+
+    function searchByEventId() {
+        document.getElementById('reset-button').disabled = false;
+        const eventIdInput = document.getElementById('event-id-input').value;
+        if (!eventIdInput) {
+            alert('Please enter an Event ID to search.');
+            return;
+        }
+
+        // Filter events by Event ID
+        const filteredEvents = events.filter(event => event.eventId === eventIdInput);
+
+        if (filteredEvents.length === 0) {
+            alert('No events found with the provided Event ID.');
+            return;
+        }
+
+        visualizeEvents(filteredEvents)
+    }
+
+    // Add this code to your existing JavaScript
+    const contextMenu = document.getElementById('context-menu');
+    const selectOption = document.getElementById('select-option');
+    let selectedEventId = null;
+
+    // Function to show the context menu at the specified position
+    function showContextMenu(x, y) {
+        const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+        const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+        contextMenu.style.left = `${x + scrollX}px`;
+        contextMenu.style.top = `${y + scrollY}px`;
+        contextMenu.style.display = 'block';
+    }
+
+    // Function to hide the context menu
+    function hideContextMenu() {
+        contextMenu.style.display = 'none';
+    }
+
+    // Event listener for right-click on event rectangles
+    visualizationDiv.addEventListener('contextmenu', (e) => {
+        e.preventDefault(); // Prevent the default context menu
+        const target = e.target;
+
+        if (target.classList.contains('event-rect')) {
+            // Get the event ID associated with the right-clicked element
+            selectedEventId = target.dataset.id;
+
+            // Show the context menu at the mouse position
+            showContextMenu(e.clientX, e.clientY);
+        }
+    });
+
+    // Event listener for the "Select" option in the context menu
+    selectOption.addEventListener('click', () => {
+        if (selectedEventId) {
+            // Search for the selected event by its ID
+            const eventIdInput = document.getElementById('event-id-input');
+            eventIdInput.value = selectedEventId
+            searchByEventId(selectedEventId);
+
+            // Hide the context menu
+            hideContextMenu();
+        }
+    });
+
+    // Event listener to hide the context menu when clicking elsewhere in the document
+    document.addEventListener('click', () => {
+        hideContextMenu();
+    });
+</script>
+</body>
+</html>

@@ -1,4 +1,4 @@
 package org.javalens.dummyapp;
 
-public record Data(String requestId, byte[] data) {
+public record Data(String requestId, int sequence, byte[] data) {
 }

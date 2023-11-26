@@ -3,6 +3,7 @@ package org.javalens.visualizer.agent.events;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.Serializer;
 import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.KryoBufferUnderflowException;
 import com.esotericsoftware.kryo.io.Output;
 import org.javalens.visualizer.model.EventBoundary;
 
@@ -52,7 +53,8 @@ public class EventsSerializer extends Serializer<List<EventBoundary>> {
                     output.writeBoolean(false);
                 } else {
                     output.writeBoolean(true);
-                    writeString(output, eventBoundary.getEventIdentifier());
+                    writeString(output, eventBoundary.getEventId());
+                    writeString(output, eventBoundary.getTraceId());
                     writeLong(output, eventBoundary.getBoundaryEpoch());
                     writeString(output, eventBoundary.getEventName());
                     writeString(output, eventBoundary.getBoundaryThread());
@@ -93,21 +95,28 @@ public class EventsSerializer extends Serializer<List<EventBoundary>> {
         } else {
             List<EventBoundary> result = new ArrayList<>(size);
             for (int i = 0; i < size; i++) {
-                boolean nonNull = input.readBoolean();
-                if (nonNull) {
-                    String eventIdentifier = readString(input);
-                    Long epoch = readLong(input);
-                    String eventName = readString(input);
-                    String boundaryThread = readString(input);
-                    EventBoundary.BoundaryTypeEnum boundaryTypeEnum = readEnum(input);
-                    result.add(new EventBoundary()
-                            .eventIdentifier(eventIdentifier)
-                            .boundaryEpoch(epoch)
-                            .eventName(eventName)
-                            .boundaryThread(boundaryThread)
-                            .boundaryType(boundaryTypeEnum));
-                } else {
-                    result.add(null);
+                try {
+                    boolean nonNull = input.readBoolean();
+                    if (nonNull) {
+                        String eventId = readString(input);
+                        String traceId = readString(input);
+                        Long epoch = readLong(input);
+                        String eventName = readString(input);
+                        String boundaryThread = readString(input);
+                        EventBoundary.BoundaryTypeEnum boundaryTypeEnum = readEnum(input);
+                        result.add(new EventBoundary()
+                                .eventId(eventId)
+                                .traceId(traceId)
+                                .boundaryEpoch(epoch)
+                                .eventName(eventName)
+                                .boundaryThread(boundaryThread)
+                                .boundaryType(boundaryTypeEnum));
+                    } else {
+                        result.add(null);
+                    }
+                } catch (KryoBufferUnderflowException e) {
+                    // File was pre maturely terminated
+                    break;
                 }
             }
             return result;
