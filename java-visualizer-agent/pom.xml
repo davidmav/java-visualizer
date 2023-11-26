@@ -72,6 +72,8 @@
                             <Main-Class>org.javalens.visualizer.exporter.ExportReport</Main-Class>
                         </manifestEntries>
                     </archive>
+                    <appendAssemblyId>false</appendAssemblyId>
+                    <finalName>java-visualizer-agent-uber</finalName>
                 </configuration>
                 <executions>
                     <execution>

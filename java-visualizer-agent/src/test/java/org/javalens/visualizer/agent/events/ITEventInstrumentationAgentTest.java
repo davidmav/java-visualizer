@@ -79,9 +79,7 @@ public class ITEventInstrumentationAgentTest {
         Path javaHome = Path.of(System.getProperty("java.home"));
         Path javaBin = javaHome.resolve("bin").resolve("java");
         Path outputPath = Path.of(System.getProperty("project.build.directory"));
-        String artifactId = System.getProperty("project.artifactId");
-        String version = System.getProperty("project.version");
-        Path agentPath = outputPath.resolve(artifactId + "-" + version + "-jar-with-dependencies.jar");
+        Path agentPath = outputPath.resolve("java-visualizer-agent-uber.jar");
         Path dummyAppPath = outputPath.resolve("dummy-test-app").resolve("dummy-test-app.jar");
         String[] CMD_ARRAY =
                 {javaBin.toString(), "-javaagent:" + agentPath, "-cp", dummyAppPath.toString(),
