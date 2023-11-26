@@ -50,36 +50,32 @@ public class App
 
         executorService = Executors.newFixedThreadPool(50);
         for (int i=0; i<25;i++) {
-            executorService.submit(new Runnable() {
-                @Override
-                public void run() {
-                    while (!shutdown) {
-                        String requestId = UUID.randomUUID().toString();
-                        try {
-                            Data o = dataProducer.produceData(requestId);
+            executorService.submit(() -> {
+                while (!shutdown) {
+                    String requestId = UUID.randomUUID().toString();
+                    try {
+                        for (int i1 = 0; i1 < 10; i1++) {
+                            Data o = dataProducer.produceData(requestId, i1);
                             queue.add(o);
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
                         }
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
                     }
                 }
             });
         }
         for (int i=0; i<25;i++) {
-            executorService.submit(new Runnable() {
-                @Override
-                public void run() {
-                    while (!shutdown) {
-                        Data poll = null;
+            executorService.submit(() -> {
+                while (!shutdown) {
+                    Data poll = null;
+                    try {
+                        poll = queue.poll(100, TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException e) {
+                    }
+                    if (poll != null) {
                         try {
-                            poll = queue.poll(100, TimeUnit.MILLISECONDS);
+                            dataConsumer.consumeData(poll);
                         } catch (InterruptedException e) {
-                        }
-                        if (poll != null) {
-                            try {
-                                dataConsumer.consumeData(poll);
-                            } catch (InterruptedException e) {
-                            }
                         }
                     }
                 }

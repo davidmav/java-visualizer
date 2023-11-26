@@ -68,6 +68,12 @@ components:
             $ref: '#/components/schemas/MethodArgumentCriteria'
         traceArguments:
           type: array
+          description: Arguments that will be used to identify and correlate the overall traced flow containing multiple events.
+          items:
+            $ref: '#/components/schemas/MethodArgument'
+        eventArguments:
+          type: array
+          description: Arguments that will be used to identify and correlate the beginning and end of a single event
           items:
             $ref: '#/components/schemas/MethodArgument'
     MethodArgument:
@@ -83,7 +89,6 @@ components:
           enum:
             - TARGET
             - METHOD
-            - RETURN_OBJECT
     MethodArgumentCriteria:
       type: object
       required:
@@ -101,6 +106,7 @@ components:
             - TARGET
             - METHOD
             - RETURN_OBJECT
+            -
     EventBoundary:
       type: object
       required:
@@ -120,7 +126,9 @@ components:
           enum:
             - START
             - END
-        eventIdentifier:
+        eventId:
+          type: string
+        traceId:
           type: string
 
     Event:
@@ -133,6 +141,8 @@ components:
         eventName:
           type: string
         eventId:
+          type: string
+        traceId:
           type: string
         thread:
           type: string

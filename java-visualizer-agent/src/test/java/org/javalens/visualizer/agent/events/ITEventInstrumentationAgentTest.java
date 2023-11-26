@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.logging.log4j.core.util.IOUtils;
 import org.javalens.dummyapp.consumer.DataConsumer;
 import org.javalens.dummyapp.producer.RandomDataProducer;
-import org.javalens.visualizer.analyzer.Analyzer;
+import org.javalens.visualizer.exporter.ExportReport;
 import org.javalens.visualizer.model.*;
 import org.junit.jupiter.api.Test;
 
@@ -31,6 +31,7 @@ public class ITEventInstrumentationAgentTest {
         Path currentDirPath = Paths.get(currentDir);
         Path instrumentedJson = currentDirPath.resolve("instrumented_events.json");
         Path testOutput = currentDirPath.resolve("target/events");
+
         createConfigurationFile(instrumentedJson, testOutput);
         Process process = startDummyAppWithAgent(instrumentedJson);
         boolean exited = process.waitFor(30, TimeUnit.SECONDS);
@@ -66,7 +67,8 @@ public class ITEventInstrumentationAgentTest {
                 throw new IllegalArgumentException("Invalid EventName " + event.getEventName());
             }
         }
-        Analyzer.main(new String[]{testOutput.toString()});
+        ExportReport.main(new String[]{"-s", testOutput.toString(), "-d", currentDirPath.toString(), "-p", "99",
+                "-l", "2000"});
         assertTrue(consumptionStart.size() > 0);
         assertTrue(consumptionEnd.size() > 0);
         assertTrue(productionStart.size() > 0);
@@ -102,6 +104,13 @@ public class ITEventInstrumentationAgentTest {
                                                 new MethodArgument()
                                                         .argumentPath("[0].requestId")
                                                         .argumentType(MethodArgument.ArgumentTypeEnum.METHOD)))
+                                        .eventArguments(List.of(
+                                                new MethodArgument()
+                                                        .argumentPath("[0].requestId")
+                                                        .argumentType(MethodArgument.ArgumentTypeEnum.METHOD),
+                                                new MethodArgument()
+                                                        .argumentPath("[0].sequence")
+                                                        .argumentType(MethodArgument.ArgumentTypeEnum.METHOD)))
                         ).eventEnd(
                                 new MethodCriteria()
                                         .eventType(MethodCriteria.EventTypeEnum.END)
@@ -110,6 +119,13 @@ public class ITEventInstrumentationAgentTest {
                                         .traceArguments(List.of(
                                                 new MethodArgument()
                                                         .argumentPath("[0].requestId")
+                                                        .argumentType(MethodArgument.ArgumentTypeEnum.METHOD)))
+                                        .eventArguments(List.of(
+                                                new MethodArgument()
+                                                        .argumentPath("[0].requestId")
+                                                        .argumentType(MethodArgument.ArgumentTypeEnum.METHOD),
+                                                new MethodArgument()
+                                                        .argumentPath("[0].sequence")
                                                         .argumentType(MethodArgument.ArgumentTypeEnum.METHOD)))
                         )
         );
@@ -125,6 +141,13 @@ public class ITEventInstrumentationAgentTest {
                                                 new MethodArgument()
                                                         .argumentPath("[0]")
                                                         .argumentType(MethodArgument.ArgumentTypeEnum.METHOD)))
+                                        .eventArguments(List.of(
+                                                new MethodArgument()
+                                                        .argumentPath("[0]")
+                                                        .argumentType(MethodArgument.ArgumentTypeEnum.METHOD),
+                                                new MethodArgument()
+                                                        .argumentPath("[1]")
+                                                        .argumentType(MethodArgument.ArgumentTypeEnum.METHOD)))
                         ).eventEnd(
                                 new MethodCriteria()
                                         .eventType(MethodCriteria.EventTypeEnum.END)
@@ -133,6 +156,13 @@ public class ITEventInstrumentationAgentTest {
                                         .traceArguments(List.of(
                                                 new MethodArgument()
                                                         .argumentPath("[0]")
+                                                        .argumentType(MethodArgument.ArgumentTypeEnum.METHOD)))
+                                        .eventArguments(List.of(
+                                                new MethodArgument()
+                                                        .argumentPath("[0]")
+                                                        .argumentType(MethodArgument.ArgumentTypeEnum.METHOD),
+                                                new MethodArgument()
+                                                        .argumentPath("[1]")
                                                         .argumentType(MethodArgument.ArgumentTypeEnum.METHOD)))
                         )
         );

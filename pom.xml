@@ -42,6 +42,9 @@
         <openai-gpt3-java.version>0.16.0</openai-gpt3-java.version>
         <pdfbox.version>2.0.29</pdfbox.version>
         <s3.version>2.20.153</s3.version>
+        <openapi-generator-maven-plugin.version>6.3.0</openapi-generator-maven-plugin.version>
+        <asm.version>9.6</asm.version>
+        <commons-cli.version>1.6.0</commons-cli.version>
     </properties>
 
     <dependencies>

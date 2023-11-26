@@ -34,24 +34,26 @@ public class EventRecorder {
         Map<MethodCriteriaRecord.Type, MethodCriteriaRecord> eventConfiguration = REPOSITORY.getEventConfiguration(eventName);
         MethodCriteriaRecord methodCriteriaRecord = eventConfiguration.get(eventType);
         MethodCriteria methodCriteria = methodCriteriaRecord.methodCriteria();
+        List<MethodArgument> eventArguments = methodCriteria.getEventArguments();
         List<MethodArgument> traceArguments = methodCriteria.getTraceArguments();
 
-        String eventIdentifier = computeEventIdentifier(targetObject, methodArguments, methodCriteria, traceArguments);
+        String eventId = computeIdentifier(targetObject, methodArguments, methodCriteria, eventArguments);
+        String traceId = computeIdentifier(targetObject, methodArguments, methodCriteria, traceArguments);
 
         SINK.recordEventBoundary(new EventBoundary()
                 .boundaryEpoch(epochMillis)
                 .boundaryThread(thread)
                 .eventName(eventName)
                 .boundaryType(EventBoundary.BoundaryTypeEnum.fromValue(eventType.name()))
-                .eventIdentifier(eventIdentifier));
+                .eventId(eventId)
+                .traceId(traceId));
     }
 
-    private static String computeEventIdentifier(Object targetObject, Object[] methodArguments, MethodCriteria methodCriteria, List<MethodArgument> traceArguments) {
+    private static String computeIdentifier(Object targetObject, Object[] methodArguments, MethodCriteria methodCriteria, List<MethodArgument> traceArguments) {
         String eventIdentifier = null;
         if (traceArguments != null && !traceArguments.isEmpty()) {
             try {
-                eventIdentifier = constructEventIdentifier(traceArguments, targetObject, methodCriteria.getMethodName(),
-                        methodArguments);
+                eventIdentifier = constructEventIdentifier(traceArguments, targetObject, methodArguments);
             } catch (NoSuchMethodException | NoSuchFieldException | IllegalAccessException e) {
                 throw new RuntimeException(e);
             }
@@ -61,7 +63,6 @@ public class EventRecorder {
 
     private static String constructEventIdentifier(List<MethodArgument> traceArguments,
                                                    Object targetObject,
-                                                   String methodName,
                                                    Object[] methodArguments) throws NoSuchMethodException, NoSuchFieldException, IllegalAccessException {
 
         StringBuilder stringBuilder = new StringBuilder();
