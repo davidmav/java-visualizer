@@ -23,6 +23,7 @@ public class UTEventsSerializerTest {
     @BeforeEach
     public void setUp() {
         kryo = new Kryo();
+        kryo.setReferences(false);
         serializer = new EventsSerializer();
     }
 

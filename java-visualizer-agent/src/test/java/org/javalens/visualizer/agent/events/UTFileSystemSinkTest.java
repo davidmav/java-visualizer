@@ -79,6 +79,7 @@ public class UTFileSystemSinkTest {
 
             // Deserialize the content using Kryo
             Kryo kryo = new Kryo();
+            kryo.setReferences(false);
             kryo.register(ArrayList.class);
             kryo.register(EventBoundary.BoundaryTypeEnum.class);
             kryo.register(EventBoundary.class);

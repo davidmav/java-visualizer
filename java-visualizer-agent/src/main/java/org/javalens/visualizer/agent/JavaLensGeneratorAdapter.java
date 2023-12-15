@@ -9,7 +9,16 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 
 import java.util.List;
 
-import static org.javalens.visualizer.agent.AdapterConstants.*;
+import static org.javalens.visualizer.agent.AdapterConstants.CURRENT_TIME_MILLIS_METHOD_NAME;
+import static org.javalens.visualizer.agent.AdapterConstants.DESCRIPTOR_DELIMITER;
+import static org.javalens.visualizer.agent.AdapterConstants.EVENT_RECORDER_CLASS;
+import static org.javalens.visualizer.agent.AdapterConstants.EVENT_TYPE_CLASS;
+import static org.javalens.visualizer.agent.AdapterConstants.JAVA_LANG_SYSTEM_CLASS;
+import static org.javalens.visualizer.agent.AdapterConstants.RECORD_EVENT_METHOD_NAME;
+import static org.javalens.visualizer.agent.AdapterConstants.TYPE_EVENT;
+import static org.javalens.visualizer.agent.AdapterConstants.TYPE_OBJECT;
+import static org.javalens.visualizer.agent.AdapterConstants.TYPE_OBJECT_ARRAY;
+import static org.javalens.visualizer.agent.AdapterConstants.TYPE_STRING;
 
 class JavaLensGeneratorAdapter extends GeneratorAdapter {
 
@@ -69,7 +78,6 @@ class JavaLensGeneratorAdapter extends GeneratorAdapter {
          *
          *     recordEvent(String eventName,
          *                 EventType eventType,
-         *                 String thread,
          *                 String threadMatchPattern,
          *                 Object targetObject,
          *                 Object[] methodArguments,
@@ -84,20 +92,6 @@ class JavaLensGeneratorAdapter extends GeneratorAdapter {
         visitFieldInsn(Opcodes.GETSTATIC, EVENT_TYPE_CLASS,
                 methodCriteriaRecord.type().name(),
                 TYPE_EVENT.getDescriptor());
-
-        // Getting the current thread
-        visitMethodInsn(Opcodes.INVOKESTATIC,
-                JAVA_LANG_THREAD_CLASS,
-                CURRENT_THREAD_METHOD_NAME,
-                getMethodInvocationDescriptor(TYPE_THREAD),
-                false);
-
-        // Inserting the thread name into the stack
-        visitMethodInsn(Opcodes.INVOKEVIRTUAL,
-                JAVA_LANG_THREAD_CLASS,
-                GET_NAME_METHOD_NAME,
-                getMethodInvocationDescriptor(TYPE_STRING),
-                false);
 
         MethodCriteria methodCriteria = methodCriteriaRecord.methodCriteria();
 
@@ -124,7 +118,7 @@ class JavaLensGeneratorAdapter extends GeneratorAdapter {
 
         // Invoke the record event method
         visitMethodInsn(Opcodes.INVOKESTATIC, EVENT_RECORDER_CLASS, RECORD_EVENT_METHOD_NAME,
-                getMethodInvocationDescriptor(Type.VOID_TYPE, TYPE_STRING, TYPE_EVENT, TYPE_STRING, TYPE_STRING,
+                getMethodInvocationDescriptor(Type.VOID_TYPE, TYPE_STRING, TYPE_EVENT, TYPE_STRING,
                         TYPE_OBJECT, TYPE_OBJECT_ARRAY, Type.LONG_TYPE),
                 false);
 

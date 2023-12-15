@@ -16,9 +16,10 @@ public class EventRecorder {
 
     private static EventConfigurationRepository REPOSITORY;
 
+    private static final long PID = ProcessHandle.current().pid();
+
     public static void recordEvent(String eventName,
                                    MethodCriteriaRecord.Type eventType,
-                                   String thread,
                                    String threadMatchPattern,
                                    Object targetObject,
                                    Object[] methodArguments,
@@ -27,7 +28,10 @@ public class EventRecorder {
             throw new IllegalStateException("EventRecorder hasn't been initialized yet");
         }
 
-        if (threadMatchPattern != null && !thread.matches(threadMatchPattern)) {
+        Thread thread = Thread.currentThread();
+        String threadName = thread.getName();
+
+        if (threadMatchPattern != null && !threadName.matches(threadMatchPattern)) {
             return;
         }
 
@@ -42,7 +46,9 @@ public class EventRecorder {
 
         SINK.recordEventBoundary(new EventBoundary()
                 .boundaryEpoch(epochMillis)
-                .boundaryThread(thread)
+                .boundaryThreadId(thread.getId())
+                .boundaryThread(threadName)
+                .processId(PID)
                 .eventName(eventName)
                 .boundaryType(EventBoundary.BoundaryTypeEnum.fromValue(eventType.name()))
                 .eventId(eventId)
