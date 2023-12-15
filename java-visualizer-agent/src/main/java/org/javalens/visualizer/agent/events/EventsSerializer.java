@@ -3,7 +3,6 @@ package org.javalens.visualizer.agent.events;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.Serializer;
 import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.KryoBufferUnderflowException;
 import com.esotericsoftware.kryo.io.Output;
 import org.javalens.visualizer.model.EventBoundary;
 
@@ -25,6 +24,7 @@ public class EventsSerializer extends Serializer<List<EventBoundary>> {
 
     public static List<EventBoundary> readEventsFromDisk(Path path) throws IOException {
         Kryo kryo = new Kryo();
+        kryo.setReferences(false);
         EventsSerializer serializer = new EventsSerializer();
         List<EventBoundary> events = new ArrayList<>();
         try (Stream<Path> walk = Files.walk(path)) {
@@ -55,16 +55,18 @@ public class EventsSerializer extends Serializer<List<EventBoundary>> {
                     output.writeBoolean(true);
                     writeString(output, eventBoundary.getEventId());
                     writeString(output, eventBoundary.getTraceId());
-                    writeLong(output, eventBoundary.getBoundaryEpoch());
+                    writePositiveLong(output, eventBoundary.getBoundaryEpoch());
                     writeString(output, eventBoundary.getEventName());
                     writeString(output, eventBoundary.getBoundaryThread());
                     writeEnum(output, eventBoundary.getBoundaryType());
+                    writePositiveLong(output, eventBoundary.getProcessId());
+                    writePositiveLong(output, eventBoundary.getBoundaryThreadId());
                 }
             }
         }
     }
 
-    private void writeLong(Output output, Long value) {
+    private void writePositiveLong(Output output, Long value) {
         output.writeLong(Objects.requireNonNullElse(value, -1L), false);
     }
 
@@ -88,7 +90,7 @@ public class EventsSerializer extends Serializer<List<EventBoundary>> {
     }
 
     @Override
-    public List<EventBoundary> read(Kryo kryo, Input input, Class<? extends List<EventBoundary>> type) {
+    public List<EventBoundary> read(Kryo kryo, Input input, Class<List<EventBoundary>> type) {
         int size = input.readInt();
         if (size == 0) {
             return Collections.emptyList();
@@ -100,21 +102,25 @@ public class EventsSerializer extends Serializer<List<EventBoundary>> {
                     if (nonNull) {
                         String eventId = readString(input);
                         String traceId = readString(input);
-                        Long epoch = readLong(input);
+                        Long epoch = readPositiveLong(input);
                         String eventName = readString(input);
                         String boundaryThread = readString(input);
                         EventBoundary.BoundaryTypeEnum boundaryTypeEnum = readEnum(input);
+                        Long processId = readPositiveLong(input);
+                        Long boundaryThreadId = readPositiveLong(input);
                         result.add(new EventBoundary()
                                 .eventId(eventId)
                                 .traceId(traceId)
                                 .boundaryEpoch(epoch)
                                 .eventName(eventName)
                                 .boundaryThread(boundaryThread)
+                                .boundaryThreadId(boundaryThreadId)
+                                .processId(processId)
                                 .boundaryType(boundaryTypeEnum));
                     } else {
                         result.add(null);
                     }
-                } catch (KryoBufferUnderflowException e) {
+                } catch (Exception e) {
                     // File was pre maturely terminated
                     break;
                 }
@@ -123,7 +129,7 @@ public class EventsSerializer extends Serializer<List<EventBoundary>> {
         }
     }
 
-    private Long readLong(Input input) {
+    private Long readPositiveLong(Input input) {
         long value = input.readLong(false);
         if (value == -1) {
             return null;

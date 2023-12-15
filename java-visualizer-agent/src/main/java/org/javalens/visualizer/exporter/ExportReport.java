@@ -1,8 +1,15 @@
 package org.javalens.visualizer.exporter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.commons.cli.*;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.CommandLineParser;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 import org.javalens.visualizer.agent.events.EventsSerializer;
+import org.javalens.visualizer.model.ChromeTraceCompleteEvent;
+import org.javalens.visualizer.model.ChromeTraceEventArgs;
 import org.javalens.visualizer.model.Event;
 import org.javalens.visualizer.model.EventBoundary;
 
@@ -17,21 +24,35 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class ExportReport {
 
+    public static final OutputFormat DEFAULT_OUTPUT_FORMAT = OutputFormat.HTML;
+
+    enum OutputFormat {
+        JSON,
+        HTML
+    }
+
     public static final String HELP_OPTION = "help";
     public static final String SOURCE_OPTION = "source";
     public static final String DESTINATION_OPTION = "destination";
+    public static final String MIN_EVENT_COUNT_OPTION = "min-event-count";
+    public static final String OUTPUT_FORMAT_OPTION = "output-format";
     public static final String PERCENTILE_OPTION = "percentile";
     public static final String LIMIT_OPTION = "limit";
     public static final int DEFAULT_LIMIT = 1000;
     public static final String REPORT_NAME_DATETIME_FORMAT = "yyyyMMddHHmmss";
-    public static final String REPORT_NAME_SUFFIX = "_report.html";
+    public static final String HTML_REPORT_NAME_SUFFIX = "_report.html";
+    public static final String JSON_REPORT_NAME_SUFFIX = "_report.json";
 
     public static void main(String[] args) throws IOException {
 
@@ -82,6 +103,18 @@ public class ExportReport {
             System.exit(1);
         }
 
+        int minEvents = -1;
+        String minEventsOption = line.getOptionValue(MIN_EVENT_COUNT_OPTION);
+        if (minEventsOption != null) {
+            try {
+                minEvents = Integer.parseInt(minEventsOption);
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid value specified for " + MIN_EVENT_COUNT_OPTION + " , the value must be a " +
+                        "a positive number");
+                System.exit(1);
+            }
+        }
+
         double percentile = -1;
         String percentileOption = line.getOptionValue(PERCENTILE_OPTION);
         if (percentileOption != null) {
@@ -108,13 +141,19 @@ public class ExportReport {
             }
         }
 
-        produceReport(eventBoundaries, percentile, limit, destinationPath);
+        String outputType = line.getOptionValue(OUTPUT_FORMAT_OPTION);
+        OutputFormat outputFormat = DEFAULT_OUTPUT_FORMAT;
+        if (outputType != null) {
+            outputFormat = OutputFormat.valueOf(outputType);
+        }
+        produceReport(outputFormat, eventBoundaries, percentile, limit, destinationPath, minEvents);
     }
 
-    private static void produceReport(List<EventBoundary> eventBoundaries, Double percentile, int limit,
-                                      Path destination) throws IOException {
+    private static void produceReport(OutputFormat outputFormat, List<EventBoundary> eventBoundaries, Double percentile, int limit,
+                                      Path destination, int minEvents) throws IOException {
         DateFormat df = new SimpleDateFormat(REPORT_NAME_DATETIME_FORMAT);
-        Path reportPath = destination.resolve(df.format(new Date()) + REPORT_NAME_SUFFIX);
+        Path reportPath = destination.resolve(df.format(new Date()) + (outputFormat.equals(OutputFormat.HTML) ?
+                HTML_REPORT_NAME_SUFFIX : JSON_REPORT_NAME_SUFFIX));
         try (InputStream resourceAsStream = ExportReport.class.getResourceAsStream("/visualizer-embedded.html");
              OutputStream outputStream = new FileOutputStream(reportPath.toFile())) {
             if (resourceAsStream == null) {
@@ -124,13 +163,34 @@ public class ExportReport {
 
             List<Event> events = parseEvents(eventBoundaries);
             List<List<Event>> groupedByTraceIdEvents = getGroupedByTraceIdEvents(events);
+            if (minEvents > 0) {
+                groupedByTraceIdEvents =
+                        groupedByTraceIdEvents.stream().filter(item -> item.size() >= minEvents).collect(Collectors.toList());
+            }
 
             events = getLimitedEventsByPercentile(percentile, limit, groupedByTraceIdEvents);
-
             ObjectMapper objectMapper = new ObjectMapper();
-            String eventsJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(events);
-            String report = reportTemplate.replace("let jsonData = []", "let jsonData = " + eventsJson);
-            outputStream.write(report.getBytes(StandardCharsets.UTF_8));
+            List<?> finalEvents;
+            if (outputFormat.equals(OutputFormat.JSON)) {
+                finalEvents = events.stream().map(item -> new ChromeTraceCompleteEvent()
+                        .name(item.getEventName())
+                        .cat(item.getEventName())
+                        .pid(item.getProcessId())
+                        .ph("X")
+                        .dur((item.getEventEndEpoch() - item.getEventStartEpoch()) * 1000)
+                        .ts(item.getEventStartEpoch())
+                        .tid(item.getThreadName() + " (" + item.getThreadId() + ")")
+                        .args(new ChromeTraceEventArgs()
+                                .eventId(item.getEventId())
+                                .traceId(item.getTraceId())
+                                .threadName(item.getThreadName()))).collect(Collectors.toList());
+                objectMapper.writerWithDefaultPrettyPrinter().writeValue(outputStream, finalEvents);
+            } else {
+                finalEvents = events;
+                String eventsJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(finalEvents);
+                String report = reportTemplate.replace("let jsonData = []", "let jsonData = " + eventsJson);
+                outputStream.write(report.getBytes(StandardCharsets.UTF_8));
+            }
         }
     }
 
@@ -208,9 +268,11 @@ public class ExportReport {
         } else {
             event.setEventEndEpoch(item.getBoundaryEpoch());
         }
-        event.setThread(item.getBoundaryThread());
+        event.setThreadName(item.getBoundaryThread());
         event.setEventId(item.getEventId());
         event.setTraceId(item.getTraceId());
+        event.setProcessId(item.getProcessId());
+        event.setThreadId(item.getBoundaryThreadId());
     }
 
     private static Options createArgOptions() {
@@ -220,6 +282,8 @@ public class ExportReport {
         options.addOption("p", "percentile", true, "Filter events by overall latency percentile");
         options.addRequiredOption("d", DESTINATION_OPTION, true, "The path where to store the output report, local file " +
                 "system only");
+        options.addOption("m", MIN_EVENT_COUNT_OPTION, true, "The minimum number of events per trace");
+        options.addOption("o", OUTPUT_FORMAT_OPTION, true, "Output format, Chrome Trace Json (json) or HTML (html)");
         options.addOption("h", HELP_OPTION, false, "Displays this help message");
         return options;
     }

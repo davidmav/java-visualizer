@@ -3,13 +3,18 @@ package org.javalens.visualizer.agent;
 import org.javalens.visualizer.model.MethodArgument;
 
 import java.lang.reflect.Field;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 class ReflectionUtils {
 
-    private ReflectionUtils() {}
+    private static final Map<Class<?>, Map<String, Field>> REFLECTION_CACHE = new ConcurrentHashMap<>();
+
+    private ReflectionUtils() {
+    }
 
     static String methodArgumentToString(MethodArgument methodArgumentConfig, Object targetObject,
-                                                 Object[] methodArguments) throws NoSuchFieldException, IllegalAccessException {
+                                         Object[] methodArguments) throws NoSuchFieldException, IllegalAccessException {
         String argumentName = methodArgumentConfig.getArgumentPath();
         String[] split = argumentName.split("\\.");
 
@@ -37,12 +42,7 @@ class ReflectionUtils {
         Object currentObject = targetObject;
         for (int i = skipFirst ? 1 : 0; i < split.length; i++) {
             String nextField = split[i];
-            Field field;
-            try {
-                field = currentObject.getClass().getField(nextField);
-            } catch (NoSuchFieldException e) {
-                field = currentObject.getClass().getDeclaredField(nextField);
-            }
+            Field field = getField(currentObject.getClass(), nextField);
             if (!field.canAccess(currentObject)) {
                 if (!field.trySetAccessible()) {
                     throw new IllegalAccessException("Could not access the field " + field.getName());
@@ -52,5 +52,21 @@ class ReflectionUtils {
         }
 
         return currentObject.toString();
+    }
+
+    private static Field getField(Class<?> clazz, String fieldName) {
+        Map<String, Field> typeMap = REFLECTION_CACHE.computeIfAbsent(clazz, k -> new ConcurrentHashMap<>());
+        return typeMap.computeIfAbsent(fieldName, k -> {
+            try {
+                return clazz.getDeclaredField(k);
+            } catch (NoSuchFieldException e) {
+                Class<?> superClass = clazz.getSuperclass();
+                if (superClass == null) {
+                    return null;
+                } else {
+                    return getField(superClass, k);
+                }
+            }
+        });
     }
 }

@@ -206,9 +206,9 @@
             <version>${commons-cli.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.esotericsoftware</groupId>
+            <groupId>com.esotericsoftware.kryo</groupId>
             <artifactId>kryo</artifactId>
-            <version>5.5.0</version>
+            <version>2.21</version>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>

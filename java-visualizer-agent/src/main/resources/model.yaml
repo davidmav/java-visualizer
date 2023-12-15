@@ -121,6 +121,12 @@ components:
           format: int64
         boundaryThread:
           type: string
+        boundaryThreadId:
+          type: integer
+          format: int64
+        processId:
+          type: integer
+          format: int64
         boundaryType:
           type: string
           enum:
@@ -138,13 +144,19 @@ components:
         - eventStartEpoch
         - eventEndEpoch
       properties:
+        processId:
+          type: integer
+          format: int64
+        threadName:
+          type: string
+        threadId:
+          type: integer
+          format: int64
         eventName:
           type: string
         eventId:
           type: string
         traceId:
-          type: string
-        thread:
           type: string
         eventStartEpoch:
           type: integer
@@ -152,6 +164,47 @@ components:
         eventEndEpoch:
           type: integer
           format: int64
+
+    ChromeTraceCompleteEvent:
+      description: "This is based on the spec https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview"
+      type: object
+      required:
+        - name
+        - pid
+        - tid
+        - ph
+      properties:
+        name:
+          description: The event name
+          type: string
+        cat:
+          description: The event category
+          type: string
+        ph:
+          description: This will have the constant value X, aka CompleteEvents
+          type: string
+        ts:
+          type: integer
+          format: int64
+        pid:
+          type: integer
+          format: int64
+        tid:
+          type: string
+        args:
+          $ref: '#/components/schemas/ChromeTraceEventArgs'
+        dur:
+          type: integer
+          format: int64
+
+    ChromeTraceEventArgs:
+      properties:
+        threadName:
+          type: string
+        eventId:
+          type: string
+        traceId:
+          type: string
 
     SinkConfiguration:
       type: object

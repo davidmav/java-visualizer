@@ -12,6 +12,7 @@
             background-color: #007bff; /* Background color for the header */
             color: white; /* Text color for the header */
         }
+
         .row {
             display: flex;
             flex-direction: column;
@@ -29,7 +30,7 @@
             width: 100%;
             height: 60vh;
             overflow-x: hidden;
-            overflow-y: auto;/* Prevent scrolling on the main container */
+            overflow-y: auto; /* Prevent scrolling on the main container */
         }
 
         .thread-axis {
@@ -162,7 +163,7 @@
             background-color: white;
             border: 1px solid #ccc;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            z-index: 1000;
+            z-index: 100000;
         }
 
         .context-menu ul {
@@ -179,22 +180,32 @@
         .context-menu ul li:hover {
             background-color: #f0f0f0;
         }
-
+        #selection-rectangle {
+            z-index: 9999; /* or a higher value if necessary */
+        }
+        #visualization-column {
+            z-index: 10000; /* or a higher value if necessary */
+        }
     </style>
 </head>
 <body>
 <h1 class="page-header">Java Visualizer Event Visualization</h1>
-    <div id="container" class="container">
-        <div class="thread-axis" id="thread-axis">
-            <!-- Vertical axis (threads) will be created here -->
-        </div>
-        <div id="separator" class="separator"></div> <!-- Separator between thread names and events -->
-        <div class="visualization-column" id="visualization-column">
-            <div class="visualization" id="visualization">
-                <!-- Event rectangles will be created here -->
-            </div>
+
+<div id="container" class="container">
+
+    <div class="thread-axis" id="thread-axis">
+        <!-- Vertical axis (threads) will be created here -->
+    </div>
+    <div id="separator" class="separator"></div> <!-- Separator between thread names and events -->
+    <div id="selection-rectangle" style="position: absolute; border: 2px dashed #007bff; display: none;"></div>
+    <div class="visualization-column" id="visualization-column">
+
+        <div class="visualization" id="visualization">
+
+            <!-- Event rectangles will be created here -->
         </div>
     </div>
+</div>
 <div id="statistics" class="event-color-mapping row">
     <div>
         <div class="search-container">
@@ -224,6 +235,7 @@
     </ul>
 </div>
 <script>
+    const containerDiv = document.getElementById('container');
     const visualizationDiv = document.getElementById('visualization');
     const separatorDiv = document.getElementById('separator');
     const visualizationColumnDiv = document.getElementById('visualization-column');
@@ -232,33 +244,122 @@
     let jsonData = []
     let events = jsonData;
 
-    visualizeEvents(events);
-    function createVisualizations(events) {
+    let isMouseDown = false;
 
+    const selectionRectangle = document.getElementById('selection-rectangle');
+
+    let selectionStartX = 0;
+
+    let totalOffset = 0;
+    let totalRange = 0;
+    let minEpoch = 0;
+    let maxEpoch = 0;
+    let containerWidth = 0;
+    let isDragging = false; // Reset the dragging flag
+
+    visualizationColumnDiv.addEventListener('mousedown', (e) => {
+        isMouseDown = true;
+        isDragging = false;
+        selectionStartX = e.clientX;
+        selectionRectangle.style.left = `${selectionStartX}px`;
+        selectionRectangle.style.top = `${visualizationColumnDiv.offsetTop}px`;
+        selectionRectangle.style.height = `${visualizationColumnDiv.clientHeight}px`;
+        console.log('Rectangle start:', selectionStartX);
+    });
+
+    visualizationColumnDiv.addEventListener('mousemove', (e) => {
+        if (isMouseDown) {
+            const currentX = e.clientX;
+            const width = Math.abs(currentX - selectionStartX);
+            if (width > 5) { // Threshold to consider as dragging
+                isDragging = true
+                selectionRectangle.style.display = 'block';
+                selectionRectangle.style.width = `${width}px`;
+                if (currentX < selectionStartX) {
+                    selectionRectangle.style.left = `${currentX}px`;
+                }
+                console.log('Rectangle width:', width);
+            }
+
+        }
+    });
+
+    containerDiv.addEventListener('mouseup', (e) => {
+        if (isMouseDown) {
+            isMouseDown = false;
+            if (!isDragging) {
+                // If it's not a drag, treat it as a click event
+                handleEventDivClick(e);
+            } else {
+                isDragging = false;
+                selectionRectangle.style.display = 'none';
+                console.log('Mouse up');
+                const rect = visualizationDiv.getBoundingClientRect();
+                const from = Math.max(0, selectionStartX - rect.left);
+                const to = Math.max(0, e.clientX - rect.left);
+                if (from < to) {
+                    filterEventsBySelection(from, to)
+                } else {
+                    filterEventsBySelection(to, from)
+                }
+            }
+
+        }
+    });
+
+    function handleEventDivClick(e) {
+        const target = e.target;
+        if (target.classList.contains('event-rect')) {
+            // Logic for eventDiv click
+            const eventId = target.dataset.id;
+            highlightEventsWithSameID(eventId);
+        }
+    }
+
+    function filterEventsBySelection(startX, endX) {
+
+        const startTime = convertXToTime(startX);
+        const endTime = convertXToTime(endX);
+        const filteredEvents = events.filter(event => {
+            return event.eventStartEpoch >= startTime && event.eventEndEpoch <= endTime;
+        });
+        visualizeEvents(filteredEvents);
+        document.getElementById('reset-button').disabled = false;
+    }
+
+    function convertXToTime(x) {
+        const scaleFactor = totalRange / containerWidth;
+        return minEpoch + (x * scaleFactor)
+    }
+
+    visualizeEvents(events);
+
+    function createVisualizations(events) {
+        selectionRectangle.style.display = 'none';
         visualizationDiv.innerHTML = ""
         threadAxisDiv.innerHTML = ""
         totalTimeDiv.innerHTML = ""
 
         const eventNameToColorMap = new Map();
 
-        const minEpoch = Math.min(...events.map(event => event.eventStartEpoch));
-        const maxEpoch = Math.max(...events.map(event => event.eventEndEpoch));
-        const totalRange = maxEpoch - minEpoch;
-        visualizationDiv.width = events.length
+        minEpoch = Math.min(...events.map(event => event.eventStartEpoch));
+        maxEpoch = Math.max(...events.map(event => event.eventEndEpoch));
+        totalRange = maxEpoch - minEpoch;
+        totalOffset = 0;
 
         const totalTimeValue = document.createElement('h3');
         totalTimeValue.textContent = `Total Events Span: ${totalRange} ms`
         totalTimeDiv.appendChild(totalTimeValue);
 
         // Create vertical axis (threads)
-        const threadNames = Array.from(new Set(events.map(event => event.thread)));
+        const threadNames = Array.from(new Set(events.map(event => event.threadName)));
 
         // Get the width of the visualization container in pixels
-        const containerWidth = Math.max(1200, Math.min(10000, visualizationDiv.width));
+        containerWidth = Math.max(1200, Math.min(10000, events.length));
 
-        let totalOffset = 0;
         events.forEach((event) => {
             const eventDiv = document.createElement('div');
+            eventDiv.style.zIndex = '15000'
 
             const eventDuration = event.eventEndEpoch - event.eventStartEpoch;
 
@@ -280,7 +381,7 @@
             const eventPixelWidth = (eventDuration / totalRange) * containerWidth;
             eventDiv.style.width = `${Math.max(eventPixelWidth, 1)}px`;
             totalOffset = Math.max(totalOffset, pixelOffset + eventPixelWidth)
-            const threadIndex = threadNames.indexOf(event.thread);
+            const threadIndex = threadNames.indexOf(event.threadName);
 
             // Calculate the width of the event
             // Set the left position based on the cumulative width of previous events in the same thread
@@ -316,7 +417,7 @@
             const threadLabel = document.createElement('div');
             threadLabel.className = 'thread-label';
             threadLabel.textContent = threadName;
-            threadLabel.style.top = `${10+ index * 40}px`;
+            threadLabel.style.top = `${10 + index * 40}px`;
             threadAxisDiv.appendChild(threadLabel);
         });
         return {eventNameToColorMap, threadNames};
@@ -406,7 +507,7 @@
             if (event.eventEndEpoch > 0 && event.eventStartEpoch > 0) {
                 const latency = event.eventEndEpoch - event.eventStartEpoch;
                 eventData[event.eventName].latencies.push(latency);
-                eventData[event.eventName].min = Math.min(eventData[event.eventName].min, latency);
+                eventData[event.eventName].min = Math.max(0, Math.min(eventData[event.eventName].min, latency));
                 eventData[event.eventName].max = Math.max(eventData[event.eventName].max, latency);
                 eventData[event.eventName].total += latency;
                 eventData[event.eventName].count += 1;
