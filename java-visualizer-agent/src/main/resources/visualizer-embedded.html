@@ -28,7 +28,15 @@
             display: flex;
             position: relative;
             width: 100%;
-            height: 60vh;
+            height: 50vh;
+            overflow-x: hidden;
+            overflow-y: auto; /* Prevent scrolling on the main container */
+        }
+
+        .timeline-container {
+            display: flex;
+            position: relative;
+            padding-top: 20px;
             overflow-x: hidden;
             overflow-y: auto; /* Prevent scrolling on the main container */
         }
@@ -46,13 +54,30 @@
             overflow-x: auto; /* Enable horizontal scrolling */
             overflow-y: hidden;
             position: relative;
+            padding-bottom: 20px;
             margin-left: 10px; /* Space for the thread-axis */
         }
 
         .visualization {
-            width: 10000px; /* Adjust this width as necessary */
             display: flex;
             flex: 1 1 auto; /* Adjust the width of the vertical axis as needed */
+        }
+
+        .timeline {
+            display: flex;
+            position: relative;
+            height: 20px;
+            left: 210px;
+            overflow-x: auto; /* Enable horizontal scrolling */
+            overflow-y: hidden;
+            white-space: nowrap;
+        }
+
+        .timeline-label {
+            position: absolute;
+            height: 20px;
+            line-height: 20px;
+            text-align: center;
         }
 
         .event-rect {
@@ -63,25 +88,6 @@
             color: white;
             cursor: pointer;
             height: 12px;
-        }
-
-        /* Drop zone styles */
-        .drop-zone {
-            width: 100%;
-            height: 100%;
-            position: absolute;
-            top: 80px;
-            left: 0;
-            background-color: rgba(255, 255, 255, 0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-        }
-
-        .drop-zone-text {
-            font-size: 18px;
-            margin-bottom: 10px;
         }
 
         /* Horizontal axis styles */
@@ -111,9 +117,10 @@
             border: 1px solid #ccc;
             background-color: white;
             width: 90%;
+            margin-top: 20px;
             margin-left: auto;
             margin-right: auto;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 40px rgba(0, 0, 0, 0.1);
             display: none;
         }
 
@@ -186,11 +193,11 @@
         #visualization-column {
             z-index: 10000; /* or a higher value if necessary */
         }
+
     </style>
 </head>
 <body>
 <h1 class="page-header">Java Visualizer Event Visualization</h1>
-
 <div id="container" class="container">
 
     <div class="thread-axis" id="thread-axis">
@@ -198,13 +205,16 @@
     </div>
     <div id="separator" class="separator"></div> <!-- Separator between thread names and events -->
     <div id="selection-rectangle" style="position: absolute; border: 2px dashed #007bff; display: none;"></div>
+
     <div class="visualization-column" id="visualization-column">
 
         <div class="visualization" id="visualization">
-
             <!-- Event rectangles will be created here -->
         </div>
     </div>
+</div>
+<div id="timeline-container" class="timeline-container">
+    <div id="timeline" class="timeline row"></div>
 </div>
 <div id="statistics" class="event-color-mapping row">
     <div>
@@ -241,7 +251,7 @@
     const visualizationColumnDiv = document.getElementById('visualization-column');
     const threadAxisDiv = document.getElementById('thread-axis');
     const totalTimeDiv = document.getElementById('total-time');
-    let jsonData = []
+    let jsonData = [ ]
     let events = jsonData;
 
     let isMouseDown = false;
@@ -264,7 +274,6 @@
         selectionRectangle.style.left = `${selectionStartX}px`;
         selectionRectangle.style.top = `${visualizationColumnDiv.offsetTop}px`;
         selectionRectangle.style.height = `${visualizationColumnDiv.clientHeight}px`;
-        console.log('Rectangle start:', selectionStartX);
     });
 
     visualizationColumnDiv.addEventListener('mousemove', (e) => {
@@ -278,7 +287,6 @@
                 if (currentX < selectionStartX) {
                     selectionRectangle.style.left = `${currentX}px`;
                 }
-                console.log('Rectangle width:', width);
             }
 
         }
@@ -306,6 +314,36 @@
 
         }
     });
+
+    function createTimeline() {
+        const timeline = document.getElementById('timeline');
+        timeline.innerHTML = ''; // Clear existing labels
+
+        // Use the totalOffset as the width for the timeline
+        const labelCount = 10; // You can adjust the number of labels
+        let labelSpacing = totalOffset / labelCount; // Dynamic spacing based on container width
+        let timeIncrement = totalRange / labelCount; // Dynamic time increments
+
+        for (let i = 0; i <= labelCount; i++) {
+            const label = document.createElement('div');
+            label.className = 'timeline-label';
+            label.style.left = `${i * labelSpacing}px`;
+            const date = new Date(minEpoch + i * timeIncrement);
+            const formattedTime = date.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
+            const milliseconds = date.getMilliseconds();
+            label.textContent = `${formattedTime}.${milliseconds.toString().padStart(3, '0')}`;
+
+            timeline.appendChild(label);
+        }
+
+        // Set the timeline width to match the container width
+        timeline.style.width = visualizationDiv.style.width;
+    }
 
     function handleEventDivClick(e) {
         const target = e.target;
@@ -417,7 +455,7 @@
             const threadLabel = document.createElement('div');
             threadLabel.className = 'thread-label';
             threadLabel.textContent = threadName;
-            threadLabel.style.top = `${10 + index * 40}px`;
+            threadLabel.style.top = `${(10 + index * 40)}px`;
             threadAxisDiv.appendChild(threadLabel);
         });
         return {eventNameToColorMap, threadNames};
@@ -452,6 +490,7 @@
         const {eventNameToColorMap, threadNames} = createVisualizations(events);
         let statistics = createStatistics(events);
         createStatisticsTable(eventNameToColorMap, threadNames, statistics);
+        createTimeline();
     }
 
     function stringToColor(str) {
@@ -597,6 +636,15 @@
     // Event listener to hide the context menu when clicking elsewhere in the document
     document.addEventListener('click', () => {
         hideContextMenu();
+    });
+    const timeline = document.getElementById('timeline');
+
+    visualizationColumnDiv.addEventListener('scroll', () => {
+        timeline.scrollLeft = visualizationColumnDiv.scrollLeft;
+    });
+
+    timeline.addEventListener('scroll', () => {
+        visualizationColumnDiv.scrollLeft = timeline.scrollLeft;
     });
 </script>
 </body>
